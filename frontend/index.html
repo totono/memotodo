@@ -133,20 +133,16 @@
     <div class="td-detail-modal-body" id="tdDetailModalBody"></div>
   </div>
 
-  <!-- 通知・表示設定モーダル（期日が近いと判定するしきい値） -->
+  <!-- 定期タスクの通知設定モーダル（期日の何日前から通知するか） -->
   <div class="td-modal-overlay td-modal-overlay-over-panel" id="tdRecurringNotifyOverlay" style="display:none;"></div>
   <div class="td-modal td-modal-over-panel" id="tdRecurringNotifyModal" style="display:none;">
     <div class="td-modal-header">
-      <span class="td-modal-title"><i class="bi bi-gear"></i> 通知・表示設定</span>
+      <span class="td-modal-title"><i class="bi bi-gear"></i> 定期タスクの通知設定</span>
       <button class="td-panel-close" id="tdRecurringNotifyClose"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="td-modal-body">
       <div class="td-field">
-        <span class="td-label">通常タスク：期日が近いと判定する営業日数</span>
-        <input type="number" class="td-input td-input-sm" id="tdRNotifyTodo" min="0" max="366">
-      </div>
-      <div class="td-field">
-        <span class="td-label">定期タスク：期日の何日前から表示するか（周期種別ごと・暦日）</span>
+        <span class="td-label">期日の何日前から通知するか（周期種別ごと）</span>
       </div>
       <div class="td-field">
         <label class="td-label">週ごとのタスク</label>
@@ -188,6 +184,26 @@
         <button type="button" class="td-btn td-btn-ghost td-btn-sm" id="tdSettingsAddTime">
           <i class="bi bi-plus"></i> 時刻を追加
         </button>
+      </div>
+      <div class="td-field">
+        <label class="td-label">通常タスク：期日の何日前から通知するか（営業日）</label>
+        <input type="number" class="td-input td-input-sm" id="tdSettingsNearDeadline" min="0" max="366">
+      </div>
+      <div class="td-field">
+        <label class="td-label">通知方式（併用可・両方OFFならアプリ内表示のみ）</label>
+        <div class="td-notify-method-grid">
+          <span></span>
+          <span class="td-notify-method-col-label">Windows通知</span>
+          <span class="td-notify-method-col-label">最前面に表示</span>
+
+          <span class="td-notify-method-row-label">リマインダー</span>
+          <label class="td-checkbox-inline"><input type="checkbox" id="tdSettingsReminderToast"></label>
+          <label class="td-checkbox-inline"><input type="checkbox" id="tdSettingsReminderFront"></label>
+
+          <span class="td-notify-method-row-label">定期通知</span>
+          <label class="td-checkbox-inline"><input type="checkbox" id="tdSettingsPeriodicToast"></label>
+          <label class="td-checkbox-inline"><input type="checkbox" id="tdSettingsPeriodicFront"></label>
+        </div>
       </div>
     </div>
     <div class="td-modal-footer">

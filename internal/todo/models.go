@@ -49,6 +49,17 @@ type Settings struct {
 	RecurringDisplayDays map[string]int `json:"recurring_display_days"`
 	// TodoNearDeadlineDays は通常メモの「期日が近い」判定に使う営業日数のしきい値。
 	TodoNearDeadlineDays int `json:"todo_near_deadline_days"`
+	// 通知の出し方（アプリ内トーストは常時表示される土台の挙動で、
+	// これに加えて Windows トースト／ウィンドウ前面化を個別にON/OFFできる。
+	// 両方OFFなら「アプリ内のみ」になる）。
+	ReminderNotifyMethod NotifyMethod `json:"reminder_notify_method"`
+	PeriodicNotifyMethod NotifyMethod `json:"periodic_notify_method"`
+}
+
+// NotifyMethod は通知の出し方（アプリ内トーストとの併用可否）。
+type NotifyMethod struct {
+	Toast        bool `json:"toast"`          // Windows のアクションセンター通知も出す
+	BringToFront bool `json:"bring_to_front"` // メインウィンドウを前面に表示する
 }
 
 // RecurringPanelData は定期タスクパネル表示用のデータ。

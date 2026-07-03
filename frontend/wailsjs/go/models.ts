@@ -45,6 +45,8 @@ export namespace main {
 	    detail_pattern?: string;
 	    recurring_display_days: Record<string, number>;
 	    todo_near_deadline_days?: number;
+	    reminder_notify_method?: todo.NotifyMethod;
+	    periodic_notify_method?: todo.NotifyMethod;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveSettingsRequest(source);
@@ -56,7 +58,27 @@ export namespace main {
 	        this.detail_pattern = source["detail_pattern"];
 	        this.recurring_display_days = source["recurring_display_days"];
 	        this.todo_near_deadline_days = source["todo_near_deadline_days"];
+	        this.reminder_notify_method = this.convertValues(source["reminder_notify_method"], todo.NotifyMethod);
+	        this.periodic_notify_method = this.convertValues(source["periodic_notify_method"], todo.NotifyMethod);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class UpdateRecurringTaskRequest {
 	    title?: string;
@@ -121,6 +143,20 @@ export namespace todo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
 	        this.value = source["value"];
+	    }
+	}
+	export class NotifyMethod {
+	    toast: boolean;
+	    bring_to_front: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NotifyMethod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.toast = source["toast"];
+	        this.bring_to_front = source["bring_to_front"];
 	    }
 	}
 	export class RecurringBadge {
@@ -211,6 +247,8 @@ export namespace todo {
 	    detail_pattern: string;
 	    recurring_display_days: Record<string, number>;
 	    todo_near_deadline_days: number;
+	    reminder_notify_method: NotifyMethod;
+	    periodic_notify_method: NotifyMethod;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -222,7 +260,27 @@ export namespace todo {
 	        this.detail_pattern = source["detail_pattern"];
 	        this.recurring_display_days = source["recurring_display_days"];
 	        this.todo_near_deadline_days = source["todo_near_deadline_days"];
+	        this.reminder_notify_method = this.convertValues(source["reminder_notify_method"], NotifyMethod);
+	        this.periodic_notify_method = this.convertValues(source["periodic_notify_method"], NotifyMethod);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Todo {
 	    id: number;

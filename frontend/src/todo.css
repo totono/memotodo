@@ -883,6 +883,19 @@ html, body {
 .td-notify-time-row { display: flex; align-items: center; gap: 8px; }
 .td-notify-time-row .td-input { max-width: 140px; }
 
+.td-notify-method-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
+  gap: 8px 12px;
+}
+.td-notify-method-col-label {
+  font-size: 11px; color: var(--text-secondary); text-align: center;
+}
+.td-notify-method-row-label { font-size: 13px; color: var(--text-primary); white-space: nowrap; }
+.td-checkbox-inline { display: flex; justify-content: center; }
+.td-checkbox-inline input { width: 16px; height: 16px; cursor: pointer; }
+
 /* ========================================
    通知トースト（アプリ内オーバーレイ通知）
    旧実装の別ウィンドウポップアップ（popup_server.py）に代わるもの。

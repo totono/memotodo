@@ -18,6 +18,10 @@ func defaultSettings() Settings {
 			"yearly":  14,
 		},
 		TodoNearDeadlineDays: DefaultNearDeadlineWorkdays,
+		// 既定はアプリ内トースト＋Windowsトースト。ウィンドウの前面化は
+		// 画面を占有して邪魔になりうるため既定OFF（ユーザーが選んでONにする）。
+		ReminderNotifyMethod: NotifyMethod{Toast: true, BringToFront: false},
+		PeriodicNotifyMethod: NotifyMethod{Toast: true, BringToFront: false},
 	}
 }
 
@@ -38,6 +42,8 @@ func (s *Store) LoadSettings() (Settings, error) {
 		DetailPattern        string         `json:"detail_pattern"`
 		RecurringDisplayDays map[string]int `json:"recurring_display_days"`
 		TodoNearDeadlineDays int            `json:"todo_near_deadline_days"`
+		ReminderNotifyMethod *NotifyMethod  `json:"reminder_notify_method"`
+		PeriodicNotifyMethod *NotifyMethod  `json:"periodic_notify_method"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return def, nil
@@ -56,6 +62,12 @@ func (s *Store) LoadSettings() (Settings, error) {
 	if raw.TodoNearDeadlineDays > 0 {
 		merged.TodoNearDeadlineDays = raw.TodoNearDeadlineDays
 	}
+	if raw.ReminderNotifyMethod != nil {
+		merged.ReminderNotifyMethod = *raw.ReminderNotifyMethod
+	}
+	if raw.PeriodicNotifyMethod != nil {
+		merged.PeriodicNotifyMethod = *raw.PeriodicNotifyMethod
+	}
 	return merged, nil
 }
 
@@ -65,6 +77,8 @@ type SettingsUpdate struct {
 	DetailPattern        *string
 	RecurringDisplayDays map[string]int
 	TodoNearDeadlineDays *int
+	ReminderNotifyMethod *NotifyMethod
+	PeriodicNotifyMethod *NotifyMethod
 }
 
 // SaveSettings は設定を保存する（既存設定にマージ）。
@@ -84,6 +98,12 @@ func (s *Store) SaveSettings(u SettingsUpdate) (Settings, error) {
 	}
 	if u.TodoNearDeadlineDays != nil {
 		current.TodoNearDeadlineDays = *u.TodoNearDeadlineDays
+	}
+	if u.ReminderNotifyMethod != nil {
+		current.ReminderNotifyMethod = *u.ReminderNotifyMethod
+	}
+	if u.PeriodicNotifyMethod != nil {
+		current.PeriodicNotifyMethod = *u.PeriodicNotifyMethod
 	}
 
 	data, err := json.MarshalIndent(current, "", "  ")

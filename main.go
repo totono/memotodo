@@ -60,7 +60,7 @@ func main() {
 				return
 			}
 			conn.Close()
-			app.bringToFront( /* force */ true)
+			app.bringToFront()
 		}
 	}()
 
@@ -141,7 +141,9 @@ func main() {
 			if quitting {
 				return false
 			}
-			app.windowHidden.Store(true)
+			// 定期通知トーストはメインウィンドウが隠れたら消しておく
+			// （再度開いたときに古い通知が残っているのを防ぐため）。
+			wailsruntime.EventsEmit(ctx, "todo:window-hidden")
 			wailsruntime.WindowHide(ctx)
 			return true
 		},
@@ -152,10 +154,10 @@ func main() {
 
 	go tray.Run(tray.Callbacks{
 		OnShow: func() {
-			app.bringToFront(true)
+			app.bringToFront()
 		},
 		OnAddTodo: func() {
-			app.bringToFront(true)
+			app.bringToFront()
 			if app.ctx != nil {
 				wailsruntime.EventsEmit(app.ctx, "todo:focus-quick-input")
 			}

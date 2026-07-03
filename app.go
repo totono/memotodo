@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/base64"
 	"fmt"
 	"net/url"
@@ -10,13 +11,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"memotodo/internal/notify"
 	"memotodo/internal/todo"
 )
+
+//go:embed build/appicon.png
+var appIconPNG embed.FS
 
 // App は Wails のフロントエンド（JS）から呼び出せるバインディングを提供する。
 // 旧 Flask REST API 層（apps/todo/__init__.py）が担っていた役割を置き換える。
@@ -24,10 +28,6 @@ type App struct {
 	ctx       context.Context
 	store     *todo.Store
 	scheduler *todo.Scheduler
-
-	// windowHidden はトレイに隠れている（WindowHide 済み）かどうか。
-	// true の間だけ、通知でウィンドウを強制的に前面表示する（bringToFront参照）。
-	windowHidden atomic.Bool
 }
 
 // NewApp は App を生成する。DBオープン等は startup 時に行う。
@@ -58,6 +58,8 @@ func (a *App) startup(ctx context.Context) {
 	if err := sched.Start(); err != nil {
 		wailsruntime.LogErrorf(ctx, "スケジューラの起動に失敗しました: %v", err)
 	}
+
+	a.initWindowsNotifications(dataDir)
 }
 
 // shutdown は Wails 終了時に呼ばれる。
@@ -68,6 +70,22 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.store != nil {
 		a.store.Close()
 	}
+}
+
+// initWindowsNotifications はWindowsのアクションセンター通知を使えるようにする。
+// 通知アイコンはトースト側の制約でファイルパス指定が必要なため、埋め込み画像を
+// データフォルダへ書き出してそのパスを渡す。通知クリック時はウィンドウを前面化する
+// （クリックは明示的な「見たい」意思表示なので、通常のフォーカス保護の対象外にする）。
+func (a *App) initWindowsNotifications(dataDir string) {
+	iconPath := filepath.Join(dataDir, "notify_icon.png")
+	if data, err := appIconPNG.ReadFile("build/appicon.png"); err == nil {
+		_ = os.WriteFile(iconPath, data, 0o644)
+	} else {
+		iconPath = ""
+	}
+	notify.Init(iconPath, func() {
+		a.bringToFront()
+	})
 }
 
 // appDataDir はDB・設定・画像を保存するディレクトリを返す（初回は作成する）。
@@ -112,35 +130,70 @@ func (a *App) handleReminderNotify(todoID int64) {
 		return
 	}
 
-	// テキスト入力中など、他のアプリを操作している最中にフォアグラウンドを奪わないよう、
-	// ウィンドウがトレイに隠れている場合のみ強制的に前面表示する。
-	// （すでに表示中なら、トーストは次にユーザーがウィンドウを見たときに気づける）
-	a.bringToFront(false)
+	// アプリ内トースト（todo.js側）は常に表示する。Windowsトースト／ウィンドウ前面化は
+	// それぞれユーザー設定でON/OFFできる（両方OFFなら「アプリ内のみ」になる）。
+	settings, _ := a.store.LoadSettings()
+	method := settings.ReminderNotifyMethod
+
 	wailsruntime.EventsEmit(a.ctx, "todo:reminder", ReminderNotifyPayload{Todo: t})
+
+	if method.Toast {
+		notify.Push("リマインダー", t.Title)
+	}
+	if method.BringToFront {
+		a.bringToFront()
+	}
 }
 
 // handlePeriodicNotify は「表示すべき通知がある」ことだけを知らせるトリガーで、
 // 内容（対象メモ・定期タスクの一覧）はフロントエンドが GetNearOrOverdueMemos /
 // GetRecurringPanel を呼んで自前で組み立てる（データ整形をフロント1箇所に寄せるため）。
 func (a *App) handlePeriodicNotify() {
-	a.bringToFront(false)
+	settings, _ := a.store.LoadSettings()
+	method := settings.PeriodicNotifyMethod
+
 	wailsruntime.EventsEmit(a.ctx, "todo:periodic")
+
+	if method.Toast {
+		if body := a.periodicNotifySummary(); body != "" {
+			notify.Push("MemoTodo リマインド", body)
+		}
+	}
+	if method.BringToFront {
+		a.bringToFront()
+	}
+}
+
+// periodicNotifySummary はWindows通知向けの短い件数サマリーを組み立てる。
+func (a *App) periodicNotifySummary() string {
+	memos, err := a.store.GetNearOrOverdueMemos()
+	if err != nil {
+		return ""
+	}
+	badge, err := a.store.GetRecurringBadgeCounts()
+	if err != nil {
+		return ""
+	}
+	var parts []string
+	if badge.Overdue > 0 {
+		parts = append(parts, fmt.Sprintf("定期タスクの残タスクが%d件", badge.Overdue))
+	}
+	if len(memos) > 0 {
+		parts = append(parts, fmt.Sprintf("期日が近い・超過したタスクが%d件", len(memos)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, "\n")
 }
 
 // bringToFront はメインウィンドウを表示・前面化する。
-//
-// force=true  : トレイクリックや多重起動時の通知など、ユーザーの明示的な操作。常に表示する。
-// force=false : リマインダー等の通知契機。ウィンドウがトレイに隠れている場合のみ表示し、
-//
-//	すでに表示中（他アプリ操作中に最小化されているだけ等）の場合はフォーカスを奪わない。
-func (a *App) bringToFront(force bool) {
+// トレイクリック・多重起動時の通知・通知クリック等の明示的な操作や、
+// 通知設定で「最前面に表示する」がONの場合に呼ばれる。
+func (a *App) bringToFront() {
 	if a.ctx == nil {
 		return
 	}
-	if !force && !a.windowHidden.Load() {
-		return
-	}
-	a.windowHidden.Store(false)
 	wailsruntime.WindowShow(a.ctx)
 	wailsruntime.WindowUnminimise(a.ctx)
 }
@@ -165,7 +218,7 @@ func (a *App) GetTodos(status string) ([]todo.Todo, error) {
 		return nil, err
 	}
 	for i := range todos {
-		todos[i].Links = todo.ParseLinks(todos[i].Memo)
+		todos[i].Links = todo.ParseLinks(todos[i].Title + "\n" + todos[i].Memo)
 	}
 	return todos, nil
 }
@@ -178,7 +231,7 @@ func (a *App) GetTodo(id int64) (todo.Todo, error) {
 	if !ok {
 		return todo.Todo{}, fmt.Errorf("メモが見つかりません")
 	}
-	t.Links = todo.ParseLinks(t.Memo)
+	t.Links = todo.ParseLinks(t.Title + "\n" + t.Memo)
 	return t, nil
 }
 
@@ -441,10 +494,12 @@ func (a *App) GetSettings() (todo.Settings, error) {
 
 // SaveSettingsRequest は設定保存の入力（未指定フィールドはnil/空）。
 type SaveSettingsRequest struct {
-	NotifyTimes          []string       `json:"notify_times"`
-	DetailPattern        *string        `json:"detail_pattern"`
-	RecurringDisplayDays map[string]int `json:"recurring_display_days"`
-	TodoNearDeadlineDays *int           `json:"todo_near_deadline_days"`
+	NotifyTimes          []string           `json:"notify_times"`
+	DetailPattern        *string            `json:"detail_pattern"`
+	RecurringDisplayDays map[string]int     `json:"recurring_display_days"`
+	TodoNearDeadlineDays *int               `json:"todo_near_deadline_days"`
+	ReminderNotifyMethod *todo.NotifyMethod `json:"reminder_notify_method"`
+	PeriodicNotifyMethod *todo.NotifyMethod `json:"periodic_notify_method"`
 }
 
 func (a *App) SaveSettings(req SaveSettingsRequest) (todo.Settings, error) {
@@ -456,6 +511,8 @@ func (a *App) SaveSettings(req SaveSettingsRequest) (todo.Settings, error) {
 		DetailPattern:        req.DetailPattern,
 		RecurringDisplayDays: req.RecurringDisplayDays,
 		TodoNearDeadlineDays: req.TodoNearDeadlineDays,
+		ReminderNotifyMethod: req.ReminderNotifyMethod,
+		PeriodicNotifyMethod: req.PeriodicNotifyMethod,
 	})
 	if err != nil {
 		return todo.Settings{}, err

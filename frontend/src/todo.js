@@ -10,6 +10,24 @@ let _openId          = null;      // 詳細を開いているメモID（null な
 let _detailPattern   = "inline";  // "inline" | "modal"（起動時に設定から読み込む）
 let _draggedId       = null;      // ドラッグ中の期日なしメモID
 let _activeModalKind = null;      // 共有モーダル(tdDetailModal)の内容種別: "memo" | "recurring" | null
+
+// 未保存の編集内容の一時保持（DBには保存しない）。空きスペースクリック等で
+// 意図せず詳細を閉じても入力内容を失わないようにするため。保存・削除・
+// キャンセル等の確定操作をしたら該当分を破棄し、メインウィンドウが閉じられた
+// （トレイに隠れた）タイミングで全て破棄する。
+const _todoDrafts      = new Map(); // todoId -> {title, memo, deadline, reminder_enabled, reminder_at}
+const _recurringDrafts = new Map(); // taskId|"new" -> {title, period_type, period_value, memo}
+
+function _applyTodoDraft(todo) {
+  const draft = _todoDrafts.get(todo.id);
+  return draft ? { ...todo, ...draft } : todo;
+}
+
+function _applyRecurringDraft(key, task) {
+  const draft = _recurringDrafts.get(key);
+  if (!draft) return task;
+  return task ? { ...task, ...draft } : { ...draft };
+}
 // #endregion
 
 // #region エラー表示
@@ -54,12 +72,15 @@ function _toEditorHtml(memo) {
 
 // リンククリックをアプリ外部（既定ブラウザ／ファイルエクスプローラ）で開く。
 // contenteditable 内・リンク一覧のどちらからも使う共通ハンドラ。
+// root 直下に後から追加された <a> （保存済みメモの初期表示・貼り付け等）も
+// 確実に拾えるよう、個別の <a> ではなく root 自体にイベント委譲する
+// （個別バインドだと、バインド後に追加された要素のリンクが反応しなくなる）。
 function _wireExternalLinkOpeners(root) {
-  root.querySelectorAll("a[href]").forEach((a) => {
-    a.addEventListener("click", (e) => {
-      e.preventDefault();
-      App.OpenURL(a.getAttribute("href")).catch(() => {});
-    });
+  root.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href]");
+    if (!a || !root.contains(a)) return;
+    e.preventDefault();
+    App.OpenURL(a.getAttribute("href")).catch(() => {});
   });
 }
 // #endregion
@@ -230,11 +251,12 @@ function _buildRow(todo, opts) {
   wrap.appendChild(row);
 
   if (isOpenInline) {
+    const draftTodo = _applyTodoDraft(todo);
     const detail = document.createElement("div");
     detail.className = "td-detail-inline";
-    detail.innerHTML = _detailFormHtml(todo);
+    detail.innerHTML = _detailFormHtml(draftTodo);
     wrap.appendChild(detail);
-    _wireDetailForm(detail, todo);
+    _wireDetailForm(detail, draftTodo);
   }
 
   _wireRowEvents(row, wrap, todo, opts);
@@ -300,6 +322,8 @@ function _wireRowEvents(row, wrap, todo, opts) {
 // 必ずここを経由して1回のロードに揃える。
 async function switchTab(tabName) {
   document.querySelectorAll(".td-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+  // 開いていた詳細の未保存内容を退避してからタブを切り替える
+  _openTodoDetailContainer()?._captureDraft?.();
   _tab = tabName;
   _openId = null;
   closeDetailModal();
@@ -310,11 +334,21 @@ async function switchTab(tabName) {
 // #endregion
 
 // #region 詳細フォーム（インライン展開／モーダル共通）
+// 現在開いている詳細フォームのコンテナ（インライン展開／モーダル本体）を返す。
+function _openTodoDetailContainer() {
+  if (_openId == null) return null;
+  return _detailPattern === "modal"
+    ? document.getElementById("tdDetailModalBody")
+    : document.querySelector(`.td-row-wrap[data-id="${_openId}"] .td-detail-inline`);
+}
+
 function toggleDetail(todoId) {
   if (_openId === todoId) {
     closeDetail();
     return;
   }
+  // 別の行に切り替える前に、今開いている行の未保存内容を退避する
+  _openTodoDetailContainer()?._captureDraft?.();
   _openId = todoId;
   if (_detailPattern === "modal") {
     openDetailModal(todoId);
@@ -324,6 +358,7 @@ function toggleDetail(todoId) {
 }
 
 function closeDetail() {
+  _openTodoDetailContainer()?._captureDraft?.();
   _openId = null;
   closeDetailModal();
   if (_tab) loadList();
@@ -334,7 +369,7 @@ async function openDetailModal(todoId) {
   const modal   = document.getElementById("tdDetailModal");
   const body    = document.getElementById("tdDetailModalBody");
   try {
-    const todo = await _fetchTodo(todoId);
+    const todo = _applyTodoDraft(await _fetchTodo(todoId));
     body.innerHTML = _detailFormHtml(todo, { modal: true });
     _wireDetailForm(body, todo, { modal: true });
     _activeModalKind = "memo";
@@ -442,32 +477,51 @@ function _wireDetailForm(container, todo, opts) {
   const titleInput = container.querySelector('[data-role="draft-title"]')
     || document.querySelector(`.td-row-wrap[data-id="${todo.id}"] [data-role="draft-title"]`);
 
+  function currentValues() {
+    return {
+      title: (titleInput ? titleInput.value : todo.title).trim() || todo.title,
+      memo: memoEditor.innerHTML,
+      deadline: container.querySelector('[data-role="deadline"]').value || null,
+      reminder_enabled: reminderCb.checked,
+      reminder_at: (reminderCb.checked && reminderDt.value) ? reminderDt.value + ":00" : null,
+    };
+  }
+
+  // 空きスペースクリック等で閉じられる直前に closeDetail() から呼ばれ、
+  // 未保存の入力内容を破棄せず _todoDrafts に退避する。
+  container._captureDraft = () => {
+    _todoDrafts.set(todo.id, currentValues());
+  };
+
   container.querySelectorAll("[data-action]").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const action = btn.dataset.action;
       try {
         if (action === "save") {
-          const payload = {
-            title: (titleInput ? titleInput.value : todo.title).trim() || todo.title,
-            memo: memoEditor.innerHTML,
-            deadline: container.querySelector('[data-role="deadline"]').value || null,
-            reminder_enabled: reminderCb.checked,
-            reminder_at: (reminderCb.checked && reminderDt.value) ? reminderDt.value + ":00" : null,
-          };
-          await _updateTodo(todo.id, payload);
+          await _updateTodo(todo.id, currentValues());
+          _todoDrafts.delete(todo.id);
+          container._captureDraft = null; // 保存済みなので closeDetail() 側で再退避させない
           closeDetail();
         } else if (action === "discard") {
+          _todoDrafts.delete(todo.id);
+          container._captureDraft = null;
           closeDetail();
         } else if (action === "delete") {
           if (!confirm("このメモを削除しますか？")) return;
           await _deleteTodo(todo.id);
+          _todoDrafts.delete(todo.id);
+          container._captureDraft = null;
           closeDetail();
         } else if (action === "complete") {
           await _completeTodo(todo.id);
+          _todoDrafts.delete(todo.id);
+          container._captureDraft = null;
           closeDetail();
         } else if (action === "restore") {
           await _restoreTodo(todo.id);
+          _todoDrafts.delete(todo.id);
+          container._captureDraft = null;
           closeDetail();
         }
       } catch (err) {
@@ -511,6 +565,9 @@ function _renderLinks(wrap, listEl, links) {
 
 // #region メモエディタ（詳細メモ：リッチテキスト）
 function _initEditor(editorEl) {
+  // 保存済みメモの初期表示分も含め、エディタ内のリンクを常に外部で開けるようにする
+  _wireExternalLinkOpeners(editorEl);
+
   editorEl.closest(".td-editor-wrap")?.querySelectorAll("[data-cmd]").forEach(btn => {
     btn.addEventListener("mousedown", (e) => {
       e.preventDefault();
@@ -526,7 +583,6 @@ function _initEditor(editorEl) {
         const url = prompt("URLを入力:", def.startsWith("http") ? def : "https://");
         if (url) {
           document.execCommand("createLink", false, url);
-          _wireExternalLinkOpeners(editorEl);
         }
       } else if (cmd === "image") {
         _pasteImageFromClipboard(editorEl);
@@ -718,7 +774,7 @@ async function renderRecurringPanel() {
   }
 
   if (_recurringOpenId === "new" && _detailPattern === "inline") {
-    addInline.innerHTML = `<div class="td-recurring-detail-inline">${_recurringDetailFormHtml(null, {})}</div>`;
+    addInline.innerHTML = `<div class="td-recurring-detail-inline">${_recurringDetailFormHtml(null, { values: _applyRecurringDraft("new", null) })}</div>`;
     _wireRecurringDetailForm(addInline, null);
   } else {
     addInline.innerHTML = "";
@@ -799,7 +855,7 @@ function _buildRecurringRow(task, variant) {
   if (_recurringOpenId === task.id) {
     const detail = document.createElement("div");
     detail.className = "td-recurring-detail-inline";
-    detail.innerHTML = _recurringDetailFormHtml(task, {});
+    detail.innerHTML = _recurringDetailFormHtml(task, { values: _applyRecurringDraft(task.id, task) });
     wrap.appendChild(detail);
     _wireRecurringDetailForm(detail, task);
   }
@@ -816,6 +872,8 @@ function openRecurringPanel() {
 }
 
 function closeRecurringPanel() {
+  // 開いていた定期タスク編集フォームの未保存内容を退避してからパネルを閉じる
+  _captureOpenRecurringDraft();
   document.getElementById("tdRecurringOverlay").style.display = "none";
   document.getElementById("tdRecurringPanel").classList.remove("is-open");
   _recurringOpenId = null;
@@ -851,7 +909,9 @@ function _weekdayOptionsHtml(selected) {
 function _recurringDetailFormHtml(task, opts) {
   opts = opts || {};
   const isNew = !task;
-  const t = task || { title: "", period_type: "weekly", period_value: "0", memo: "", is_active: 1 };
+  // opts.values があれば表示内容の元にする（未保存下書きの復元用）。
+  // isNew（新規かどうか）はあくまで実際の task の有無で判定する。
+  const t = opts.values || task || { title: "", period_type: "weekly", period_value: "0", memo: "", is_active: 1 };
   const [ym, yd] = t.period_type === "yearly" ? t.period_value.split("-") : ["1", "1"];
 
   return `
@@ -909,6 +969,7 @@ function _recurringDetailFormHtml(task, opts) {
 
 function _wireRecurringDetailForm(container, task) {
   const isNew = !task;
+  const draftKey = isNew ? "new" : task.id;
   const periodType   = container.querySelector('[data-role="r-period-type"]');
   const weeklyField  = container.querySelector('[data-role="r-weekly-field"]');
   const monthlyField = container.querySelector('[data-role="r-monthly-field"]');
@@ -933,12 +994,25 @@ function _wireRecurringDetailForm(container, task) {
     return `${m}-${d}`;
   }
 
+  // 空きスペースクリック等で閉じられる直前に closeRecurringDetail() から呼ばれ、
+  // 未保存の入力内容を破棄せず _recurringDrafts に退避する。
+  container._captureDraft = () => {
+    _recurringDrafts.set(draftKey, {
+      title: container.querySelector('[data-role="r-title"]').value,
+      period_type: periodType.value,
+      period_value: getPeriodValue(),
+      memo: container.querySelector('[data-role="r-memo"]').value,
+    });
+  };
+
   container.querySelectorAll("[data-action]").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const action = btn.dataset.action;
       try {
         if (action === "r-cancel") {
+          _recurringDrafts.delete(draftKey);
+          container._captureDraft = null;
           closeRecurringDetail();
         } else if (action === "r-save") {
           const title = container.querySelector('[data-role="r-title"]').value.trim();
@@ -953,13 +1027,19 @@ function _wireRecurringDetailForm(container, task) {
           };
           if (isNew) await App.CreateRecurringTask(body);
           else await App.UpdateRecurringTask(task.id, body);
+          _recurringDrafts.delete(draftKey);
+          container._captureDraft = null;
           closeRecurringDetail();
         } else if (action === "r-delete") {
           if (!confirm("この定期タスクを削除しますか？")) return;
           await _deleteRecurring(task.id);
+          _recurringDrafts.delete(draftKey);
+          container._captureDraft = null;
           closeRecurringDetail();
         } else if (action === "r-toggle-active") {
           await App.UpdateRecurringTask(task.id, { is_active: !task.is_active });
+          _recurringDrafts.delete(draftKey);
+          container._captureDraft = null;
           closeRecurringDetail();
         }
       } catch (err) {
@@ -970,6 +1050,7 @@ function _wireRecurringDetailForm(container, task) {
 }
 
 async function openRecurringDetail(taskId) {
+  const draftKey = taskId == null ? "new" : taskId;
   if (_detailPattern === "modal") {
     let task = null;
     if (taskId != null) {
@@ -983,13 +1064,15 @@ async function openRecurringDetail(taskId) {
     const overlay = document.getElementById("tdDetailOverlay");
     const modal   = document.getElementById("tdDetailModal");
     const body    = document.getElementById("tdDetailModalBody");
-    body.innerHTML = _recurringDetailFormHtml(task, { modal: true });
+    body.innerHTML = _recurringDetailFormHtml(task, { modal: true, values: _applyRecurringDraft(draftKey, task) });
     _wireRecurringDetailForm(body, task);
     _activeModalKind = "recurring";
     overlay.style.display = "block";
     modal.style.display   = "flex";
   } else {
-    _recurringOpenId = taskId == null ? "new" : taskId;
+    // 別の行を開いていた場合、その未保存内容を退避してから切り替える
+    _captureOpenRecurringDraft();
+    _recurringOpenId = draftKey;
     await renderRecurringPanel();
     const anchor = taskId == null
       ? document.getElementById("tdRecurringAddInline")
@@ -998,7 +1081,21 @@ async function openRecurringDetail(taskId) {
   }
 }
 
+// 現在開いている定期タスクの詳細フォームのコンテナを返す。
+function _openRecurringDetailContainer() {
+  if (_recurringOpenId == null) return null;
+  if (_detailPattern === "modal") return document.getElementById("tdDetailModalBody");
+  return _recurringOpenId === "new"
+    ? document.getElementById("tdRecurringAddInline")
+    : document.querySelector(`.td-recurring-row-wrap[data-id="${_recurringOpenId}"] .td-recurring-detail-inline`);
+}
+
+function _captureOpenRecurringDraft() {
+  _openRecurringDetailContainer()?._captureDraft?.();
+}
+
 function closeRecurringDetail() {
+  _captureOpenRecurringDraft();
   _recurringOpenId = null;
   _activeModalKind = null;
   document.getElementById("tdDetailOverlay").style.display = "none";
@@ -1018,7 +1115,6 @@ function _initRecurringNotifyModal() {
   const fWeekly  = document.getElementById("tdRNotifyWeekly");
   const fMonthly = document.getElementById("tdRNotifyMonthly");
   const fYearly  = document.getElementById("tdRNotifyYearly");
-  const fTodo    = document.getElementById("tdRNotifyTodo");
 
   async function open() {
     try {
@@ -1027,9 +1123,8 @@ function _initRecurringNotifyModal() {
       fWeekly.value  = days.weekly ?? 3;
       fMonthly.value = days.monthly ?? 7;
       fYearly.value  = days.yearly ?? 14;
-      fTodo.value    = settings.todo_near_deadline_days ?? 3;
     } catch (e) {
-      fWeekly.value = 3; fMonthly.value = 7; fYearly.value = 14; fTodo.value = 3;
+      fWeekly.value = 3; fMonthly.value = 7; fYearly.value = 14;
     }
     overlay.style.display = "block";
     modal.style.display   = "flex";
@@ -1053,11 +1148,9 @@ function _initRecurringNotifyModal() {
           monthly: parseInt(fMonthly.value, 10) || 0,
           yearly: parseInt(fYearly.value, 10) || 0,
         },
-        todo_near_deadline_days: parseInt(fTodo.value, 10) || 0,
       });
       close();
       renderRecurringPanel();
-      if (_tab) loadList();
     } catch (e) {
       alert(_errMsg(e) || "保存に失敗しました");
     }
@@ -1076,6 +1169,11 @@ function _initSettingsModal() {
   const patternWrap = document.getElementById("tdSettingsPattern");
   const timesWrap = document.getElementById("tdSettingsNotifyTimes");
   const btnAddTime = document.getElementById("tdSettingsAddTime");
+  const fNearDeadline = document.getElementById("tdSettingsNearDeadline");
+  const fReminderToast = document.getElementById("tdSettingsReminderToast");
+  const fReminderFront = document.getElementById("tdSettingsReminderFront");
+  const fPeriodicToast = document.getElementById("tdSettingsPeriodicToast");
+  const fPeriodicFront = document.getElementById("tdSettingsPeriodicFront");
 
   let pattern = _detailPattern;
   let times = [];
@@ -1115,9 +1213,21 @@ function _initSettingsModal() {
       const settings = await App.GetSettings();
       pattern = settings.detail_pattern || "inline";
       times   = [...(settings.notify_times || [])];
+      fNearDeadline.value = settings.todo_near_deadline_days ?? 3;
+      const rMethod = settings.reminder_notify_method || {};
+      const pMethod = settings.periodic_notify_method || {};
+      fReminderToast.checked = rMethod.toast ?? true;
+      fReminderFront.checked = rMethod.bring_to_front ?? false;
+      fPeriodicToast.checked = pMethod.toast ?? true;
+      fPeriodicFront.checked = pMethod.bring_to_front ?? false;
     } catch (e) {
       pattern = _detailPattern;
       times = [];
+      fNearDeadline.value = 3;
+      fReminderToast.checked = true;
+      fReminderFront.checked = false;
+      fPeriodicToast.checked = true;
+      fPeriodicFront.checked = false;
     }
     renderPattern();
     renderTimes();
@@ -1137,10 +1247,17 @@ function _initSettingsModal() {
 
   btnSave.addEventListener("click", async () => {
     try {
-      await App.SaveSettings({ detail_pattern: pattern, notify_times: times });
+      await App.SaveSettings({
+        detail_pattern: pattern,
+        notify_times: times,
+        todo_near_deadline_days: parseInt(fNearDeadline.value, 10) || 0,
+        reminder_notify_method: { toast: fReminderToast.checked, bring_to_front: fReminderFront.checked },
+        periodic_notify_method: { toast: fPeriodicToast.checked, bring_to_front: fPeriodicFront.checked },
+      });
       _detailPattern = pattern;
       closeDetail();
       close();
+      loadList();
     } catch (e) {
       alert(_errMsg(e) || "保存に失敗しました");
     }
@@ -1150,28 +1267,29 @@ function _initSettingsModal() {
 
 // #region 通知トースト（リマインダー・定期通知）
 // 旧実装の別プロセス・別ウィンドウのポップアップ（popup_server.py）を、
-// 単一ウィンドウ内のオーバーレイに置き換えたもの。ユーザーが手動で閉じるまで
-// （定期通知は30秒のタイムアウトで）残る、という挙動自体は再現する。
+// 単一ウィンドウ内のオーバーレイに置き換えたもの。閉じるボタンを押すか
+// メインウィンドウが閉じられる（トレイに隠れる）まで残り続ける
+// （タイムアウトによる自動消滅はしない）。
 let _toastTimer = null;
+let _toastKind  = null; // "reminder" | "periodic" | null
 
 function _closeToast() {
   const toast = document.getElementById("tdToast");
   toast.style.display = "none";
   toast.innerHTML = "";
+  _toastKind = null;
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
 }
 
-function _showToast(html, timeoutSec) {
+function _showToast(html, kind) {
   const toast = document.getElementById("tdToast");
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
   toast.innerHTML = html;
   toast.style.display = "block";
+  _toastKind = kind;
   toast.querySelectorAll('[data-toast-action="close"]').forEach(el => {
     el.addEventListener("click", _closeToast);
   });
-  if (timeoutSec) {
-    _toastTimer = setTimeout(_closeToast, timeoutSec * 1000);
-  }
 }
 
 function _renderReminderToast(todo) {
@@ -1202,7 +1320,7 @@ function _renderReminderToast(todo) {
       <button class="td-btn td-btn-secondary" data-toast-action="close">閉じる</button>
     </div>
   `;
-  _showToast(html, null);
+  _showToast(html, "reminder");
 
   const toast = document.getElementById("tdToast");
   toast.querySelectorAll("[data-snooze]").forEach(btn => {
@@ -1216,6 +1334,7 @@ function _renderReminderToast(todo) {
   toast.querySelector('[data-toast-action="detail"]').addEventListener("click", async () => {
     _closeToast();
     if (_tab !== "pending") await switchTab("pending");
+    else _openTodoDetailContainer()?._captureDraft?.();
     // 通知経由の場合は、インライン設定でも一覧内スクロールを要求せず
     // 常にモーダルで詳細を開く（該当メモへすぐアクセスできるようにするため）。
     _openId = todo.id;
@@ -1293,6 +1412,7 @@ async function _renderPeriodicToast() {
       todoOverdue.map(t => _toastItemRow(t.title, _fmtDeadline(t.deadline), async () => {
         _closeToast();
         if (_tab !== "pending") await switchTab("pending");
+        else _openTodoDetailContainer()?._captureDraft?.();
         _openId = t.id;
         openDetailModal(t.id);
       }))),
@@ -1300,6 +1420,7 @@ async function _renderPeriodicToast() {
       todoNear.map(t => _toastItemRow(t.title, _fmtDeadline(t.deadline), async () => {
         _closeToast();
         if (_tab !== "pending") await switchTab("pending");
+        else _openTodoDetailContainer()?._captureDraft?.();
         _openId = t.id;
         openDetailModal(t.id);
       }))),
@@ -1335,10 +1456,10 @@ async function _renderPeriodicToast() {
 
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
   toast.style.display = "block";
+  _toastKind = "periodic";
   toast.querySelectorAll('[data-toast-action="close"]').forEach(el => {
     el.addEventListener("click", _closeToast);
   });
-  _toastTimer = setTimeout(_closeToast, 30000);
 }
 
 function _initNotifications() {
@@ -1350,6 +1471,14 @@ function _initNotifications() {
   });
   EventsOn("todo:focus-quick-input", () => {
     focusQuickInput();
+  });
+  // メインウィンドウがトレイに隠れたら、定期通知トーストは消しておく
+  // （リマインダー通知は手動で閉じるまで残す、という仕様のまま維持する）。
+  // 未保存の下書きもこのタイミングで破棄する。
+  EventsOn("todo:window-hidden", () => {
+    if (_toastKind === "periodic") _closeToast();
+    _todoDrafts.clear();
+    _recurringDrafts.clear();
   });
 }
 // #endregion
@@ -1370,6 +1499,12 @@ document.addEventListener("click", (e) => {
   _outsideClickArmed = false;
 
   if (_detailPattern !== "inline") return;
+
+  // 「＋」ボタンなど、新規フォームを開くトリガー自体のクリックは対象外にする。
+  // これらのボタンは開こうとしているフォームの表示先（例: tdRecurringAddInline）の
+  // 外側にあるため、素朴に「開いている行の外側か」だけで判定すると、開いた直後の
+  // 同一クリックで即座に閉じてしまう。
+  if (e.target.closest("#tdBtnRecurringAdd")) return;
 
   if (_openId != null) {
     const wrap = document.querySelector(`.td-row-wrap[data-id="${_openId}"]`);
