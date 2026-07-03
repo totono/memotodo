@@ -1,6 +1,8 @@
 import { Todo, main } from '../api/client'
 import { useUiStore, TodoDraft } from '../state/uiStore'
 import { useTodoMutations } from '../hooks/useTodoMutations'
+import RichTextEditor from './RichTextEditor'
+import DetectedLinks from './DetectedLinks'
 
 // ドラフトと元 todo をマージした現在値（現行 _applyTodoDraft と同じ）
 function merged(todo: Todo, draft?: TodoDraft) {
@@ -64,9 +66,8 @@ export default function TodoDetail({ todo, modal = false }: { todo: Todo; modal?
 
       <div className="td-field">
         <span className="td-detail-label">詳細メモ</span>
-        {/* Task 9 で RichTextEditor に置換 */}
-        <textarea className="td-editor" style={{ minHeight: 120 }} value={v.memo ?? ''}
-          onChange={(e) => patch({ memo: e.target.value })} />
+        <RichTextEditor value={v.memo ?? ''} onChange={(html) => patch({ memo: html })} />
+        <DetectedLinks links={todo.links} />
       </div>
 
       <div className="td-detail-footer">
