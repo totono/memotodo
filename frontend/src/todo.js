@@ -10,6 +10,7 @@ let _openId          = null;      // 詳細を開いているメモID（null な
 let _detailPattern   = "inline";  // "inline" | "modal"（起動時に設定から読み込む）
 let _draggedId       = null;      // ドラッグ中の期日なしメモID
 let _activeModalKind = null;      // 共有モーダル(tdDetailModal)の内容種別: "memo" | "recurring" | null
+let _listGen         = 0;         // loadList() の世代番号。並行呼び出し時に最新描画だけを反映させ、行の二重追加を防ぐ
 
 // 未保存の編集内容の一時保持（DBには保存しない）。空きスペースクリック等で
 // 意図せず詳細を閉じても入力内容を失わないようにするため。保存・削除・
@@ -129,6 +130,10 @@ async function _toggleImportant(id) {
 
 // #region 一覧描画
 async function loadList() {
+  // 複数の loadList() が並行して走ると、クリア(innerHTML="")と await 後の appendChild が
+  // 交錯して行が二重に追加される。世代番号を採番し、await から戻った時点で自分が最新でなければ
+  // 描画を破棄することで、常に最後の呼び出しだけが DOM を書き換えるようにする。
+  const gen = ++_listGen;
   const loading = document.getElementById("tdLoading");
   const empty   = document.getElementById("tdEmpty");
   const card    = document.getElementById("tdCard");
@@ -145,6 +150,7 @@ async function loadList() {
 
   try {
     let todos = await _fetchTodos(_tab);
+    if (gen !== _listGen) return; // より新しい loadList() が始まっている → この描画は破棄
     todos = todos || [];
 
     if (_tab === "pending") {
@@ -178,6 +184,7 @@ async function loadList() {
     dated.forEach(todo  => listDated.appendChild(_buildRow(todo, { draggable: false })));
 
   } catch (e) {
+    if (gen !== _listGen) return; // 古い呼び出しのエラーで最新の描画を上書きしない
     loading.style.display = "none";
     listNoDate.innerHTML = `<div style="padding:24px;color:var(--accent);font-size:13px;">読み込みに失敗しました</div>`;
   }
@@ -1255,9 +1262,8 @@ function _initSettingsModal() {
         periodic_notify_method: { toast: fPeriodicToast.checked, bring_to_front: fPeriodicFront.checked },
       });
       _detailPattern = pattern;
-      closeDetail();
       close();
-      loadList();
+      closeDetail(); // 詳細を閉じつつ新パターンで一覧を再描画する（内部で loadList() を呼ぶ）
     } catch (e) {
       alert(_errMsg(e) || "保存に失敗しました");
     }
