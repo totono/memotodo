@@ -12,6 +12,20 @@ export interface TodoDraft {
   reminder_at?: string | null
 }
 
+export type RecurringOpenId = number | 'new' | null
+
+// 定期タスクの未保存編集ドラフト（DB には保存しない）。period_value は保存時に
+// weekday/monthDay/yearMonth/yearDay から組み立てる（種別切替で各値を保持するため）。
+export interface RecurringDraft {
+  title?: string
+  memo?: string
+  period_type?: string
+  weekday?: string
+  monthDay?: number
+  yearMonth?: number
+  yearDay?: number
+}
+
 interface UiState {
   activeTab: Tab
   openId: number | null
@@ -22,6 +36,13 @@ interface UiState {
   setDetailPattern: (p: DetailPattern) => void
   setDraft: (id: number, draft: TodoDraft) => void
   clearDraft: (id: number) => void
+  recurringPanelOpen: boolean
+  recurringOpenId: RecurringOpenId
+  recurringDrafts: Record<string, RecurringDraft>
+  setRecurringPanelOpen: (open: boolean) => void
+  setRecurringOpenId: (id: RecurringOpenId) => void
+  setRecurringDraft: (key: string, draft: RecurringDraft) => void
+  clearRecurringDraft: (key: string) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -38,5 +59,18 @@ export const useUiStore = create<UiState>((set) => ({
       const next = { ...s.drafts }
       delete next[id]
       return { drafts: next }
+    }),
+  recurringPanelOpen: false,
+  recurringOpenId: null,
+  recurringDrafts: {},
+  // パネルを閉じるときは開いていた詳細を畳む（ドラフトは保持）。
+  setRecurringPanelOpen: (open) => set(open ? { recurringPanelOpen: true } : { recurringPanelOpen: false, recurringOpenId: null }),
+  setRecurringOpenId: (id) => set({ recurringOpenId: id }),
+  setRecurringDraft: (key, draft) => set((s) => ({ recurringDrafts: { ...s.recurringDrafts, [key]: draft } })),
+  clearRecurringDraft: (key) =>
+    set((s) => {
+      const next = { ...s.recurringDrafts }
+      delete next[key]
+      return { recurringDrafts: next }
     }),
 }))
