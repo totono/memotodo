@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { App, main } from '../api/client'
+import { qk } from '../api/queryKeys'
 
 export function useTodoMutations() {
   const qc = useQueryClient()
   const invalidateLists = () => {
-    qc.invalidateQueries({ queryKey: ['todos'] })
-    qc.invalidateQueries({ queryKey: ['nearOrOverdue'] })
+    qc.invalidateQueries({ queryKey: qk.todosAll() })
+    qc.invalidateQueries({ queryKey: qk.nearOrOverdue() })
   }
 
   const create = useMutation({
@@ -20,12 +21,12 @@ export function useTodoMutations() {
 
   const update = useMutation({
     mutationFn: ({ id, req }: { id: number; req: main.UpdateTodoRequest }) => App.UpdateTodo(id, req),
-    onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: ['todo', id] }) },
+    onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: qk.todo(id) }) },
   })
 
   const reorder = useMutation({
     mutationFn: (ids: number[]) => App.ReorderTodos(ids),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['todos', 'pending'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.todos('pending') }),
   })
 
   return { create, complete, restore, remove, toggleImportant, update, invalidateLists, reorder }

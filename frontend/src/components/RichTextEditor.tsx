@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -23,6 +23,9 @@ export default function RichTextEditor({
   value: string
   onChange: (html: string) => void
 }) {
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -32,7 +35,7 @@ export default function RichTextEditor({
       Image,
     ],
     content: value || '',
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => onChangeRef.current(editor.getHTML()),
     editorProps: {
       // 保存済みメモ内・貼付後のリンクは既定ブラウザで開く（現行 _wireExternalLinkOpeners 相当）
       handleClickOn: (_view, _pos, _node, _nodePos, event) => {

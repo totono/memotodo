@@ -33,4 +33,7 @@ describe('computeReorder', () => {
   it('from か to が無ければ元の配列を返す', () => {
     expect(computeReorder([1, 2, 3], 9, 2)).toEqual([1, 2, 3])
   })
+  it('to が見つからなければ元の配列を返す', () => {
+    expect(computeReorder([1, 2, 3], 2, 9)).toEqual([1, 2, 3])
+  })
 })

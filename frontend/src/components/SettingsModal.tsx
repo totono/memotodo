@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { App, main } from '../api/client'
@@ -19,9 +19,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [pToast, setPToast] = useState(true)
   const [pFront, setPFront] = useState(false)
 
+  const seeded = useRef(false)
+
   // 現在の設定で初期化（モーダルを開いた時点の値を反映）
   useEffect(() => {
-    if (!settings) return
+    if (!settings || seeded.current) return
+    seeded.current = true
     setPattern(settings.detail_pattern === 'modal' ? 'modal' : 'inline')
     setTimes([...(settings.notify_times || [])])
     setNearDays(settings.todo_near_deadline_days ?? 3)

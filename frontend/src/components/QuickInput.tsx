@@ -8,6 +8,7 @@ export default function QuickInput() {
   const { create } = useTodoMutations()
 
   const submit = () => {
+    if (create.isPending) return
     const title = value.trim()
     if (!title) return
     create.mutate(
