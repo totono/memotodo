@@ -2,6 +2,7 @@ import { useRecurringPanel, useRecurringTasks } from '../hooks/useRecurring'
 import { useUiStore } from '../state/uiStore'
 import RecurringRow from './RecurringRow'
 import RecurringDetail from './RecurringDetail'
+import RecurringDetailModal from './RecurringDetailModal'
 
 export default function RecurringPanel() {
   const open = useUiStore((s) => s.recurringPanelOpen)
@@ -16,6 +17,9 @@ export default function RecurringPanel() {
   const current = panel?.current ?? []
   const shownIds = new Set([...overdue, ...current].map((t) => t.id))
   const rest = (allTasks ?? []).filter((t) => !shownIds.has(t.id))
+
+  const modalTask =
+    typeof openId === 'number' ? [...overdue, ...current, ...rest].find((t) => t.id === openId) ?? null : null
 
   return (
     <>
@@ -73,6 +77,7 @@ export default function RecurringPanel() {
           {rest.length === 0 && <div className="td-empty">定期タスクはまだありません</div>}
         </div>
       </aside>
+      {detailPattern === 'modal' && openId != null && <RecurringDetailModal task={modalTask} />}
     </>
   )
 }
