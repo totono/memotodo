@@ -16,10 +16,10 @@
   - **Phase 0（プロトタイプ）完了・`develop` に統合済み**（マージ `f5de380`）。メモ一覧／クイック追加／行アクション／詳細（インライン＋モーダル・ドラフト）／TipTap リッチテキスト（画像貼付）／dnd-kit 並び替え／設定モーダル。4ゲート全PASS、Vitest 11/11。
   - **Go バックエンド（`app.go`）と `frontend/wailsjs/` バインディングは移行を通じて無変更。** Wails が `wails dev`/`wails build` 時に自動再生成する。
 - **ブランチ構成**：
-  - `main`（`49efc5c`）= 安定版（現行バニラアプリ。**移行完了までここは触らない**）。**旧 `frontend/src/todo.js` と旧 `frontend/index.html` が残っているので、定期タスクの元実装の参照元になる**（後述）。
-  - `develop`（`54dfe5d`）= 移行統合ブランチ。**Phase A〜D はここを起点**。
-  - `feat/react-migration`（`380be7b`）= develop に完全マージ済み（削除可）。
-  - `fix/duplicate-rows-and-dev-startup`（`67f1f65`）= 二重表示バグ修正＋dev起動修正。**main 未反映**（下記「未決事項」）。
+  - `main`（`67f1f65`）= 安定版（現行バニラアプリ ＋ 二重表示バグ修正/dev起動修正を反映済み。**移行完了までここは新規開発しない**）。origin より 2 コミット先行＝**ローカルのみ・未push**（リリース時にユーザーが push）。**旧 `frontend/src/todo.js` と旧 `frontend/index.html` が残っているので、定期タスクの元実装の参照元になる**（後述）。
+  - `develop`（Phase Aハンドオーバー時点で `37d15d1`）= 移行統合ブランチ。**Phase A〜D はここを起点**。
+  - `feat/react-migration` = **削除済み**（develop に完全マージ済みだった）。
+  - `fix/duplicate-rows-and-dev-startup`（`67f1f65`）= main にマージ済みで **redundant**（`main` 上で `git branch -d` すれば削除可。放置しても無害）。
 
 ## 2. 開発環境の要点
 
@@ -83,10 +83,11 @@
 - ブランチは `develop` 起点。実作業はさらに feature ブランチを切ってもよい（好みで。Phase 0 は develop 直下で進めた）。
 - 各コミットメッセージ末尾に、**その時のセッションが提供する** `Co-Authored-By:` と `Claude-Session:` トレーラを付ける（ハーネスがセッションごとに正しい URL を注入する。この文書の値をハードコードしない）。
 
-## 8. 未決事項（Phase A と独立、都合のよい時に）
+## 8. 旧・未決事項（対応済み）
 
-- `fix/duplicate-rows-and-dev-startup` → **`main` にマージ**（現行バニラアプリのバグ修正＋dev起動修正。develop 側は todo.js 削除済みで無関係）。
-- `feat/react-migration` は develop に完全マージ済み → **削除して良い**（`git branch -d feat/react-migration`）。
+- ✅ `fix/duplicate-rows-and-dev-startup` を **`main` に fast-forward マージ済み**（ローカルのみ・未push。リリース時に `git push origin main`）。
+- ✅ `feat/react-migration` は **削除済み**。
+- 残：`fix/duplicate-rows-and-dev-startup` ブランチ自体は main と同一で redundant。気になるなら `git checkout main && git branch -d fix/duplicate-rows-and-dev-startup`（develop 上からは「未マージ」判定で消せないので main 上で）。
 
 ## 9. 完了の定義（Phase A）
 
