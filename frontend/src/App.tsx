@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from './hooks/useSettings'
 import { useTodos } from './hooks/useTodos'
 import { useUiStore } from './state/uiStore'
+import { useInlineDetailOutsideClose } from './hooks/useInlineDetailOutsideClose'
 import Tabs from './components/Tabs'
 import TodoList from './components/TodoList'
 import QuickInput from './components/QuickInput'
@@ -19,6 +20,8 @@ export default function App() {
   const { data: todos } = useTodos()
   const openTodo = openId != null ? todos?.find((t) => t.id === openId) : undefined
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useInlineDetailOutsideClose()
 
   useEffect(() => {
     if (settings?.detail_pattern === 'inline' || settings?.detail_pattern === 'modal') {

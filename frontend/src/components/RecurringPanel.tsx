@@ -35,7 +35,7 @@ export default function RecurringPanel() {
         <div className="td-recurring-panel-header">
           <span className="td-panel-title"><i className="bi bi-arrow-repeat" /> 定期タスク</span>
           <div className="td-recurring-panel-header-actions">
-            <button className="td-icon-btn" title="定期タスクを追加" onClick={() => setOpenId('new')}>
+            <button className="td-icon-btn" title="定期タスクを追加" data-recurring-add="" onClick={() => setOpenId('new')}>
               <i className="bi bi-plus-lg" />
             </button>
             <button className="td-icon-btn" title="定期タスクの通知設定" onClick={() => setNotifyOpen(true)}>
@@ -48,7 +48,7 @@ export default function RecurringPanel() {
         </div>
         <div className="td-recurring-panel-body">
           {openId === 'new' && detailPattern === 'inline' && (
-            <div className="td-recurring-detail-inline">
+            <div className="td-recurring-detail-inline" data-recurring-new="">
               <RecurringDetail task={null} />
             </div>
           )}
