@@ -66,12 +66,18 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 // appDataDir はDB・設定・画像を保存するディレクトリを返す（初回は作成する）。
+// %AppData% 等のOS標準の場所は使わず、実行ファイルと同じフォルダの直下（data/）に
+// 置くことで、フォルダごとコピーするだけで持ち運べるポータブル運用にする。
 func appDataDir() (string, error) {
-	base, err := os.UserConfigDir()
+	exe, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "MemoTodo")
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(filepath.Dir(exe), "data")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

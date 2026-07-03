@@ -12,7 +12,7 @@ DeskPortal の TODO MOD（付箋的なメモ管理＋定期タスク管理）を
 
 ## データ保存先
 
-`os.UserConfigDir()/MemoTodo/`（Windows では `%AppData%\MemoTodo\`）に SQLite DB (`todo.db`)、設定 (`todo_settings.json`)、添付画像 (`todo_images/`) を保存します。
+実行ファイル（`memotodo.exe`）と同じフォルダ直下の `data/` に SQLite DB (`todo.db`)、設定 (`todo_settings.json`)、添付画像 (`todo_images/`) を保存します。`%AppData%` 等のOS標準の場所は使わず単一フォルダに完結させているため、フォルダごとコピーするだけで持ち運べます。
 
 ## 開発
 
