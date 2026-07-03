@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useRecurringPanel, useRecurringTasks } from '../hooks/useRecurring'
 import { useUiStore } from '../state/uiStore'
 import RecurringRow from './RecurringRow'
 import RecurringDetail from './RecurringDetail'
 import RecurringDetailModal from './RecurringDetailModal'
+import RecurringNotifyModal from './RecurringNotifyModal'
 
 export default function RecurringPanel() {
   const open = useUiStore((s) => s.recurringPanelOpen)
@@ -17,6 +19,7 @@ export default function RecurringPanel() {
   const current = panel?.current ?? []
   const shownIds = new Set([...overdue, ...current].map((t) => t.id))
   const rest = (allTasks ?? []).filter((t) => !shownIds.has(t.id))
+  const [notifyOpen, setNotifyOpen] = useState(false)
 
   const modalTask =
     typeof openId === 'number' ? [...overdue, ...current, ...rest].find((t) => t.id === openId) ?? null : null
@@ -35,7 +38,7 @@ export default function RecurringPanel() {
             <button className="td-icon-btn" title="定期タスクを追加" onClick={() => setOpenId('new')}>
               <i className="bi bi-plus-lg" />
             </button>
-            <button className="td-icon-btn" title="定期タスクの通知設定">
+            <button className="td-icon-btn" title="定期タスクの通知設定" onClick={() => setNotifyOpen(true)}>
               <i className="bi bi-gear" />
             </button>
             <button className="td-icon-btn" title="閉じる" onClick={() => setPanelOpen(false)}>
@@ -78,6 +81,7 @@ export default function RecurringPanel() {
         </div>
       </aside>
       {detailPattern === 'modal' && openId != null && <RecurringDetailModal task={modalTask} />}
+      {notifyOpen && <RecurringNotifyModal onClose={() => setNotifyOpen(false)} />}
     </>
   )
 }
