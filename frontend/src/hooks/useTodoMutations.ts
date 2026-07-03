@@ -13,5 +13,10 @@ export function useTodoMutations() {
     onSuccess: invalidateLists,
   })
 
-  return { create, invalidateLists }
+  const complete = useMutation({ mutationFn: (id: number) => App.CompleteTodo(id), onSuccess: invalidateLists })
+  const restore = useMutation({ mutationFn: (id: number) => App.RestoreTodo(id), onSuccess: invalidateLists })
+  const remove = useMutation({ mutationFn: (id: number) => App.DeleteTodo(id), onSuccess: invalidateLists })
+  const toggleImportant = useMutation({ mutationFn: (id: number) => App.ToggleImportant(id), onSuccess: invalidateLists })
+
+  return { create, complete, restore, remove, toggleImportant, invalidateLists }
 }

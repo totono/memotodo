@@ -1,11 +1,13 @@
 import { Todo } from '../api/client'
 import { useUiStore } from '../state/uiStore'
+import { useTodoMutations } from '../hooks/useTodoMutations'
 import { fmtDeadline, previewText } from '../lib/format'
 
 export default function TodoRow({ todo }: { todo: Todo }) {
   const activeTab = useUiStore((s) => s.activeTab)
   const openId = useUiStore((s) => s.openId)
   const setOpenId = useUiStore((s) => s.setOpenId)
+  const { complete, restore, toggleImportant } = useTodoMutations()
   const isDone = activeTab === 'done'
   const isOpen = openId === todo.id
 
@@ -20,7 +22,7 @@ export default function TodoRow({ todo }: { todo: Todo }) {
 
   return (
     <div className={rowClass}>
-      <div className={`td-checkbox ${isDone ? 'is-checked' : ''}`} title={isDone ? '未完了に戻す' : '完了にする'}>
+      <div className={`td-checkbox ${isDone ? 'is-checked' : ''}`} title={isDone ? '未完了に戻す' : '完了にする'} onClick={() => (isDone ? restore.mutate(todo.id) : complete.mutate(todo.id))}>
         {isDone ? <i className="bi bi-check-lg" /> : null}
       </div>
       <div className="td-row-main">
@@ -35,7 +37,7 @@ export default function TodoRow({ todo }: { todo: Todo }) {
         {todo.memo && todo.memo.trim() ? (
           <span className="td-meta-icon" title="詳細メモあり"><i className="bi bi-journal-text" /></span>
         ) : null}
-        <button className={`td-icon-btn td-btn-important ${todo.is_important ? 'is-active' : ''}`} title="重要">
+        <button className={`td-icon-btn td-btn-important ${todo.is_important ? 'is-active' : ''}`} title="重要" onClick={() => toggleImportant.mutate(todo.id)}>
           <i className={`bi ${todo.is_important ? 'bi-star-fill' : 'bi-star'}`} />
         </button>
         {todo.deadline ? <span className={`td-deadline-chip ${chipClass}`}>{fmtDeadline(todo.deadline)}</span> : null}
