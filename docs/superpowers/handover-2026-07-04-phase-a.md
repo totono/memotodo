@@ -15,11 +15,15 @@
 - **移行状況**：フロントを「バンドラーなし素JS」から **React 18 + Vite 5 + TypeScript** へ移行中。
   - **Phase 0（プロトタイプ）完了・`develop` に統合済み**（マージ `f5de380`）。メモ一覧／クイック追加／行アクション／詳細（インライン＋モーダル・ドラフト）／TipTap リッチテキスト（画像貼付）／dnd-kit 並び替え／設定モーダル。4ゲート全PASS、Vitest 11/11。
   - **Go バックエンド（`app.go`）と `frontend/wailsjs/` バインディングは移行を通じて無変更。** Wails が `wails dev`/`wails build` 時に自動再生成する。
+- **リモート構成（fork ワークフロー）**：
+  - `origin` = **`totono/memotodo`**（自分の fork。develop など作業ブランチの push 先）
+  - `upstream` = `brexbrex13/memotodo`（元の友人リポジトリ＝他人。参照元）
+  - gh は **`totono`（個人アカウント）** で認証済み（`acorns-shiraki` は仕事用で非アクティブ）。
 - **ブランチ構成**：
-  - `main`（`67f1f65`）= 安定版（現行バニラアプリ ＋ 二重表示バグ修正/dev起動修正を反映済み。**移行完了までここは新規開発しない**）。origin より 2 コミット先行＝**ローカルのみ・未push**（リリース時にユーザーが push）。**旧 `frontend/src/todo.js` と旧 `frontend/index.html` が残っているので、定期タスクの元実装の参照元になる**（後述）。
-  - `develop`（Phase Aハンドオーバー時点で `37d15d1`）= 移行統合ブランチ。**Phase A〜D はここを起点**。
+  - `main`（`49efc5c` = upstream/main と同一）= 現行バニラアプリの基点。**移行中はここで新規開発しない**。**旧 `frontend/src/todo.js` と旧 `frontend/index.html` が残っており、定期タスクの元実装の参照元**（`git show main:frontend/src/todo.js` 等、後述）。
+  - `develop`（origin=totono に push 済み）= 移行統合ブランチ。**Phase A〜D はここを起点、push 先も `origin`(totono)**。
   - `feat/react-migration` = **削除済み**（develop に完全マージ済みだった）。
-  - `fix/duplicate-rows-and-dev-startup`（`67f1f65`）= main にマージ済みで **redundant**（`main` 上で `git branch -d` すれば削除可。放置しても無害）。
+  - `fix/duplicate-rows-and-dev-startup`（`67f1f65`）= 二重表示バグ修正＋dev起動修正。ローカル＋`origin`(totono) にあり。**brexbrex13 への PR は保留**（totono の gh トークンで他人 public リポジトリへの PR 作成が 403/404、Web 比較も fork 直後の伝播で不安定だったため）。友人のバニラアプリに還元したくなったら後日 collaborator 追加 or Web から PR。**develop には無関係**（todo.js 削除済み）。
 
 ## 2. 開発環境の要点
 
@@ -83,11 +87,11 @@
 - ブランチは `develop` 起点。実作業はさらに feature ブランチを切ってもよい（好みで。Phase 0 は develop 直下で進めた）。
 - 各コミットメッセージ末尾に、**その時のセッションが提供する** `Co-Authored-By:` と `Claude-Session:` トレーラを付ける（ハーネスがセッションごとに正しい URL を注入する。この文書の値をハードコードしない）。
 
-## 8. 旧・未決事項（対応済み）
+## 8. バグ修正ブランチ／PR の状況
 
-- ✅ `fix/duplicate-rows-and-dev-startup` を **`main` に fast-forward マージ済み**（ローカルのみ・未push。リリース時に `git push origin main`）。
-- ✅ `feat/react-migration` は **削除済み**。
-- 残：`fix/duplicate-rows-and-dev-startup` ブランチ自体は main と同一で redundant。気になるなら `git checkout main && git branch -d fix/duplicate-rows-and-dev-startup`（develop 上からは「未マージ」判定で消せないので main 上で）。
+- `feat/react-migration` は **削除済み**（develop に統合済み）。
+- `fix/duplicate-rows-and-dev-startup`：二重表示バグ＋dev起動の修正。ローカル＋`origin`(totono) に push 済み。**brexbrex13 への PR 作成は断念**（totono トークンで他人 public repo への PR が 403/404）。当面は fork 側に温存。友人リポジトリへ還元したくなったら：`brexbrex13` が `totono` を collaborator に追加 → Web/CLI で PR、が確実。
+- develop（React 版）にはこの修正は不要（todo.js を削除済みのため無関係）。
 
 ## 9. 完了の定義（Phase A）
 
