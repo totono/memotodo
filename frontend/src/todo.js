@@ -1240,6 +1240,45 @@ function _initNotifications() {
 }
 // #endregion
 
+// #region インライン展開の詳細フォーム：空きスペースクリックで閉じる
+// モーダル方式は元々オーバーレイのクリックで閉じられる（保存はしない＝破棄）ため、
+// インライン方式でも同じ操作感になるよう、開いている行の外側をクリックしたら
+// 保存せずに閉じる。ドラッグ操作中（テキスト選択を伴う場合がある）は誤閉じしないよう、
+// mousedown 時点で対象を記録しておき、click イベント側で最終判定する。
+let _outsideClickArmed = false;
+
+document.addEventListener("mousedown", (e) => {
+  _outsideClickArmed = true;
+}, true);
+
+document.addEventListener("click", (e) => {
+  if (!_outsideClickArmed) return;
+  _outsideClickArmed = false;
+
+  if (_detailPattern !== "inline") return;
+
+  if (_openId != null) {
+    const wrap = document.querySelector(`.td-row-wrap[data-id="${_openId}"]`);
+    if (wrap && !wrap.contains(e.target)) {
+      closeDetail();
+    }
+  }
+
+  if (_recurringOpenId != null) {
+    const panel = document.getElementById("tdRecurringPanel");
+    // パネル自体の外側クリックは既存の _bindOutsideDismiss(tdRecurringOverlay) 側に任せる
+    if (panel && panel.contains(e.target)) {
+      const rWrap = _recurringOpenId === "new"
+        ? document.getElementById("tdRecurringAddInline")
+        : document.querySelector(`.td-recurring-row-wrap[data-id="${_recurringOpenId}"]`);
+      if (rWrap && !rWrap.contains(e.target)) {
+        closeRecurringDetail();
+      }
+    }
+  }
+});
+// #endregion
+
 // #region イベント登録
 document.addEventListener("DOMContentLoaded", async () => {
 

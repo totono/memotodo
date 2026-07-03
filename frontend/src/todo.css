@@ -282,6 +282,10 @@ html, body {
   padding: 13px 20px;
   cursor: default;
   transition: background .12s;
+  /* ドラッグ&ドロップでの並び替え中に本文がテキスト選択されてしまい、
+     並び替え操作が中断されるのを防ぐ（入力欄・エディタ側は下で個別に復元） */
+  user-select: none;
+  -webkit-user-select: none;
 }
 .td-row:hover { background: #FBFAF7; }
 
@@ -347,6 +351,9 @@ html, body {
   outline: none;
   min-height: 1.6em;
   field-sizing: content;
+  /* .td-row の user-select:none（並び替え時の誤選択防止）を編集欄では解除する */
+  user-select: text;
+  -webkit-user-select: text;
 }
 .td-row-title-input:focus { background: #fff; box-shadow: 0 0 0 2px rgba(200,96,74,.12); }
 

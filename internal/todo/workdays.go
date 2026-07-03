@@ -7,9 +7,13 @@ const NearDeadlineWorkdays = 3
 
 const dateLayout = "2006-01-02"
 
+// today はローカルの「今日」の日付を、UTC 0時アンカーの time.Time として返す。
+// parseDate（time.Parse は既定でUTC解釈）と同じ基準に揃えることで、
+// Sub() による日数計算がタイムゾーンのオフセット分ズレないようにしている。
+// （揃えていないと、UTC以外のタイムゾーンで期日近接・超過判定が1日ズレることがある）
 func today() time.Time {
 	now := time.Now()
-	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 func isWorkday(d time.Time) bool {

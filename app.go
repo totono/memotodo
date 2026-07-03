@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -23,6 +24,10 @@ type App struct {
 	ctx       context.Context
 	store     *todo.Store
 	scheduler *todo.Scheduler
+
+	// windowHidden はトレイに隠れている（WindowHide 済み）かどうか。
+	// true の間だけ、通知でウィンドウを強制的に前面表示する（bringToFront参照）。
+	windowHidden atomic.Bool
 }
 
 // NewApp は App を生成する。DBオープン等は startup 時に行う。
@@ -114,7 +119,10 @@ func (a *App) handleReminderNotify(todoID int64) {
 		return
 	}
 
-	a.bringToFront()
+	// テキスト入力中など、他のアプリを操作している最中にフォアグラウンドを奪わないよう、
+	// ウィンドウがトレイに隠れている場合のみ強制的に前面表示する。
+	// （すでに表示中なら、トーストは次にユーザーがウィンドウを見たときに気づける）
+	a.bringToFront(false)
 	wailsruntime.EventsEmit(a.ctx, "todo:reminder", ReminderNotifyPayload{Todo: t})
 }
 
@@ -127,7 +135,7 @@ func (a *App) handlePeriodicNotify() {
 	if err != nil {
 		return
 	}
-	a.bringToFront()
+	a.bringToFront(false)
 	wailsruntime.EventsEmit(a.ctx, "todo:periodic", PeriodicNotifyPayload{
 		Count:            len(nearOrOverdue),
 		RecurringOverdue: badge.Overdue,
@@ -135,10 +143,20 @@ func (a *App) handlePeriodicNotify() {
 	})
 }
 
-func (a *App) bringToFront() {
+// bringToFront はメインウィンドウを表示・前面化する。
+//
+// force=true  : トレイクリックや多重起動時の通知など、ユーザーの明示的な操作。常に表示する。
+// force=false : リマインダー等の通知契機。ウィンドウがトレイに隠れている場合のみ表示し、
+//
+//	すでに表示中（他アプリ操作中に最小化されているだけ等）の場合はフォーカスを奪わない。
+func (a *App) bringToFront(force bool) {
 	if a.ctx == nil {
 		return
 	}
+	if !force && !a.windowHidden.Load() {
+		return
+	}
+	a.windowHidden.Store(false)
 	wailsruntime.WindowShow(a.ctx)
 	wailsruntime.WindowUnminimise(a.ctx)
 }

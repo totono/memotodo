@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"memotodo/internal/todo"
 	"memotodo/internal/tray"
 )
 
@@ -26,21 +28,70 @@ import (
 var assets embed.FS
 
 // singleInstancePort は多重起動防止用のロック代わりに使うポート。
-// 実際にHTTPサーバーとしては使わず、バインドできるかどうかだけを見る
-// （旧DeskPortalの「同一ポートが使用中なら新規プロセスは起動せず終了する」という
-//
-//	多重起動防止の思想を踏襲）。
+// 実際にHTTPサーバーとしては使わず、接続を受け付けたら「表示要求」とみなす
+// 簡易シグナルチャネルとして使う（旧DeskPortalの「同一ポートが使用中なら
+// 新規プロセスは起動せず終了する」という多重起動防止の思想を踏襲しつつ、
+// 二重起動時は既存インスタンスのウィンドウを前面に出す）。
 const singleInstancePort = 18432
+
+const defaultWindowWidth = 1180
+const defaultWindowHeight = 800
 
 func main() {
 	lock, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", singleInstancePort))
 	if err != nil {
+		// 既に起動中のインスタンスへ「表示して」と伝えてから終了する
+		if conn, dialErr := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", singleInstancePort), 2*time.Second); dialErr == nil {
+			conn.Close()
+		}
 		fmt.Println("MemoTodo はすでに起動しています。")
 		return
 	}
 	defer lock.Close()
 
 	app := NewApp()
+
+	// 多重起動された側からの接続を「メインウィンドウを表示する」トリガーとして扱う
+	// （トレイの「開く」と同じ動作）。
+	go func() {
+		for {
+			conn, err := lock.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close()
+			app.bringToFront( /* force */ true)
+		}
+	}()
+
+	// ウィンドウサイズはデータフォルダに保存し、次回起動時に復元する
+	// （保存先が決まらない場合はデフォルトサイズにフォールバックする）。
+	dataDir, dataDirErr := appDataDir()
+	width, height := defaultWindowWidth, defaultWindowHeight
+	startState := options.Normal
+	if dataDirErr == nil {
+		if ws, ok := todo.LoadWindowState(dataDir); ok {
+			width, height = ws.Width, ws.Height
+			if ws.Maximized {
+				startState = options.Maximised
+			}
+		}
+	}
+
+	saveWindowState := func(ctx context.Context) {
+		if dataDirErr != nil {
+			return
+		}
+		w, h := wailsruntime.WindowGetSize(ctx)
+		maximized := wailsruntime.WindowIsMaximised(ctx)
+		if maximized {
+			// 最大化中は元のウィンドウサイズが取得できないため、直前の非最大化サイズを保持する
+			if prev, ok := todo.LoadWindowState(dataDir); ok {
+				w, h = prev.Width, prev.Height
+			}
+		}
+		_ = todo.SaveWindowState(dataDir, todo.WindowState{Width: w, Height: h, Maximized: maximized})
+	}
 
 	// /todo-images/ 配下は SaveImage で保存した画像ファイルをディスクから配信する。
 	// それ以外は埋め込みフロントエンド資産（frontend/）を配信する。
@@ -72,9 +123,10 @@ func main() {
 	quitting := false
 
 	wailsApp := &options.App{
-		Title:  "MemoTodo",
-		Width:  1180,
-		Height: 800,
+		Title:            "MemoTodo",
+		Width:            width,
+		Height:           height,
+		WindowStartState: startState,
 		AssetServer: &assetserver.Options{
 			Assets:     frontendFS,
 			Middleware: imagesMiddleware,
@@ -83,11 +135,13 @@ func main() {
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		OnBeforeClose: func(ctx context.Context) bool {
+			saveWindowState(ctx)
 			// ウィンドウを閉じてもアプリは常駐させ、トレイに残す。
 			// トレイの「終了」メニューからのみ完全終了する。
 			if quitting {
 				return false
 			}
+			app.windowHidden.Store(true)
 			wailsruntime.WindowHide(ctx)
 			return true
 		},
@@ -98,19 +152,18 @@ func main() {
 
 	go tray.Run(tray.Callbacks{
 		OnShow: func() {
-			if app.ctx != nil {
-				wailsruntime.WindowShow(app.ctx)
-				wailsruntime.WindowUnminimise(app.ctx)
-			}
+			app.bringToFront(true)
 		},
 		OnAddTodo: func() {
+			app.bringToFront(true)
 			if app.ctx != nil {
-				wailsruntime.WindowShow(app.ctx)
-				wailsruntime.WindowUnminimise(app.ctx)
 				wailsruntime.EventsEmit(app.ctx, "todo:focus-quick-input")
 			}
 		},
 		OnQuit: func() {
+			if app.ctx != nil {
+				saveWindowState(app.ctx)
+			}
 			quitting = true
 			if app.ctx != nil {
 				wailsruntime.Quit(app.ctx)
