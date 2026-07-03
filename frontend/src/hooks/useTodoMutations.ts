@@ -18,5 +18,10 @@ export function useTodoMutations() {
   const remove = useMutation({ mutationFn: (id: number) => App.DeleteTodo(id), onSuccess: invalidateLists })
   const toggleImportant = useMutation({ mutationFn: (id: number) => App.ToggleImportant(id), onSuccess: invalidateLists })
 
-  return { create, complete, restore, remove, toggleImportant, invalidateLists }
+  const update = useMutation({
+    mutationFn: ({ id, req }: { id: number; req: main.UpdateTodoRequest }) => App.UpdateTodo(id, req),
+    onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: ['todo', id] }) },
+  })
+
+  return { create, complete, restore, remove, toggleImportant, update, invalidateLists }
 }

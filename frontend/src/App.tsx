@@ -1,14 +1,20 @@
 import { useEffect } from 'react'
 import { useSettings } from './hooks/useSettings'
+import { useTodos } from './hooks/useTodos'
 import { useUiStore } from './state/uiStore'
 import Tabs from './components/Tabs'
 import TodoList from './components/TodoList'
 import QuickInput from './components/QuickInput'
+import DetailModal from './components/DetailModal'
 
 export default function App() {
   const { data: settings } = useSettings()
   const setDetailPattern = useUiStore((s) => s.setDetailPattern)
   const activeTab = useUiStore((s) => s.activeTab)
+  const openId = useUiStore((s) => s.openId)
+  const detailPattern = useUiStore((s) => s.detailPattern)
+  const { data: todos } = useTodos()
+  const openTodo = openId != null ? todos?.find((t) => t.id === openId) : undefined
 
   useEffect(() => {
     if (settings?.detail_pattern === 'inline' || settings?.detail_pattern === 'modal') {
@@ -38,6 +44,7 @@ export default function App() {
           <div className="td-list-wrap"><TodoList /></div>
         </div>
       </main>
+      {detailPattern === 'modal' && openTodo && <DetailModal todo={openTodo} />}
     </div>
   )
 }
