@@ -15,6 +15,8 @@ export function DeleteRecurringTask(arg1:number):Promise<void>;
 
 export function DeleteTodo(arg1:number):Promise<void>;
 
+export function GetNearOrOverdueMemos():Promise<Array<todo.Todo>>;
+
 export function GetRecurringPanel():Promise<todo.RecurringPanelData>;
 
 export function GetRecurringTask(arg1:number):Promise<todo.RecurringTask>;

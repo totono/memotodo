@@ -9,7 +9,11 @@ import (
 	"fyne.io/systray"
 )
 
-//go:embed icon.png
+// アイコンは .ico 形式で埋め込む。fyne.io/systray は Windows 環境では
+// SetIcon に .ico のバイト列を要求する（PNG を渡すと反映されない）ため、
+// Windows/macOS/Linux 共通で使える .ico を使う。
+//
+//go:embed icon.ico
 var iconFS embed.FS
 
 // Callbacks はトレイメニュー選択時に呼ばれるハンドラ群。
@@ -25,7 +29,7 @@ func Run(cb Callbacks) {
 }
 
 func onReady(cb Callbacks) {
-	if icon, err := iconFS.ReadFile("icon.png"); err == nil {
+	if icon, err := iconFS.ReadFile("icon.ico"); err == nil {
 		systray.SetIcon(icon)
 	}
 	systray.SetTitle("MemoTodo")

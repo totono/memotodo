@@ -2,8 +2,9 @@ package todo
 
 import "time"
 
-// NearDeadlineWorkdays は「期限が近い」と判定する営業日数のしきい値。
-const NearDeadlineWorkdays = 3
+// DefaultNearDeadlineWorkdays は「期限が近い」と判定する営業日数のしきい値の初期値。
+// 実際の判定にはユーザー設定（Settings.TodoNearDeadlineDays）を使う。
+const DefaultNearDeadlineWorkdays = 3
 
 const dateLayout = "2006-01-02"
 
@@ -48,12 +49,12 @@ func parseDate(s string) (time.Time, bool) {
 	return d, true
 }
 
-func isNearDeadline(deadlineStr string) bool {
+func isNearDeadline(deadlineStr string, nearDeadlineWorkdays int) bool {
 	target, ok := parseDate(deadlineStr)
 	if !ok {
 		return false
 	}
-	return countWorkdaysUntil(target) <= NearDeadlineWorkdays
+	return countWorkdaysUntil(target) <= nearDeadlineWorkdays
 }
 
 func isOverdue(deadlineStr string) bool {
@@ -64,7 +65,7 @@ func isOverdue(deadlineStr string) bool {
 	return target.Before(today())
 }
 
-func attachFlags(t *Todo) {
+func attachFlags(t *Todo, nearDeadlineWorkdays int) {
 	t.IsOverdue = isOverdue(t.Deadline)
-	t.IsNear = !t.IsOverdue && isNearDeadline(t.Deadline)
+	t.IsNear = !t.IsOverdue && isNearDeadline(t.Deadline, nearDeadlineWorkdays)
 }

@@ -102,13 +102,6 @@ type ReminderNotifyPayload struct {
 	Todo todo.Todo `json:"todo"`
 }
 
-// PeriodicNotifyPayload は定期通知イベントのペイロード。
-type PeriodicNotifyPayload struct {
-	Count            int `json:"count"`
-	RecurringOverdue int `json:"recurring_overdue"`
-	NearDeadlineDays int `json:"near_deadline_days"`
-}
-
 func (a *App) handleReminderNotify(todoID int64) {
 	reminded := true
 	if _, err := a.store.UpdateTodo(todoID, todo.TodoUpdate{Reminded: &reminded}); err != nil {
@@ -126,21 +119,12 @@ func (a *App) handleReminderNotify(todoID int64) {
 	wailsruntime.EventsEmit(a.ctx, "todo:reminder", ReminderNotifyPayload{Todo: t})
 }
 
+// handlePeriodicNotify は「表示すべき通知がある」ことだけを知らせるトリガーで、
+// 内容（対象メモ・定期タスクの一覧）はフロントエンドが GetNearOrOverdueMemos /
+// GetRecurringPanel を呼んで自前で組み立てる（データ整形をフロント1箇所に寄せるため）。
 func (a *App) handlePeriodicNotify() {
-	nearOrOverdue, err := a.store.GetNearOrOverdueMemos()
-	if err != nil {
-		return
-	}
-	badge, err := a.store.GetRecurringBadgeCounts()
-	if err != nil {
-		return
-	}
 	a.bringToFront(false)
-	wailsruntime.EventsEmit(a.ctx, "todo:periodic", PeriodicNotifyPayload{
-		Count:            len(nearOrOverdue),
-		RecurringOverdue: badge.Overdue,
-		NearDeadlineDays: todo.NearDeadlineWorkdays,
-	})
+	wailsruntime.EventsEmit(a.ctx, "todo:periodic")
 }
 
 // bringToFront はメインウィンドウを表示・前面化する。
@@ -162,6 +146,15 @@ func (a *App) bringToFront(force bool) {
 }
 
 // --- メモ CRUD ---
+
+// GetNearOrOverdueMemos は定期通知の一覧表示用に、期日が近い・超過しているメモを返す。
+func (a *App) GetNearOrOverdueMemos() ([]todo.Todo, error) {
+	todos, err := a.store.GetNearOrOverdueMemos()
+	if err != nil {
+		return nil, err
+	}
+	return todos, nil
+}
 
 func (a *App) GetTodos(status string) ([]todo.Todo, error) {
 	if status != "pending" && status != "done" {
@@ -451,6 +444,7 @@ type SaveSettingsRequest struct {
 	NotifyTimes          []string       `json:"notify_times"`
 	DetailPattern        *string        `json:"detail_pattern"`
 	RecurringDisplayDays map[string]int `json:"recurring_display_days"`
+	TodoNearDeadlineDays *int           `json:"todo_near_deadline_days"`
 }
 
 func (a *App) SaveSettings(req SaveSettingsRequest) (todo.Settings, error) {
@@ -461,6 +455,7 @@ func (a *App) SaveSettings(req SaveSettingsRequest) (todo.Settings, error) {
 		NotifyTimes:          req.NotifyTimes,
 		DetailPattern:        req.DetailPattern,
 		RecurringDisplayDays: req.RecurringDisplayDays,
+		TodoNearDeadlineDays: req.TodoNearDeadlineDays,
 	})
 	if err != nil {
 		return todo.Settings{}, err

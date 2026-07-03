@@ -65,15 +65,15 @@
       <div class="td-list-wrap" id="tdListArea">
         <div class="td-loading" id="tdLoading"><span class="td-spinner"></span></div>
         <div class="td-empty" id="tdEmpty" style="display:none;">タスクはありません</div>
-        <div class="td-card" id="tdCard" style="display:none;">
-          <div class="td-section-label" id="tdNoDateLabel" style="display:none;">期日なし</div>
-          <div class="td-list" id="tdListNoDate"></div>
-          <div class="td-separator" id="tdSeparator" style="display:none;">
-            <span class="td-separator-line"></span>
-            <span class="td-separator-label"><i class="bi bi-calendar3"></i> 期日あり</span>
-            <span class="td-separator-line"></span>
+        <div class="td-card-group" id="tdCard" style="display:none;">
+          <div class="td-card" id="tdNoDateCard" style="display:none;">
+            <div class="td-section-label" id="tdNoDateLabel">期日なし</div>
+            <div class="td-list" id="tdListNoDate"></div>
           </div>
-          <div class="td-list" id="tdListDated"></div>
+          <div class="td-card" id="tdDatedCard" style="display:none;">
+            <div class="td-section-label" id="tdDatedLabel"><i class="bi bi-calendar3"></i> 期日あり</div>
+            <div class="td-list" id="tdListDated"></div>
+          </div>
         </div>
       </div>
 
@@ -133,16 +133,20 @@
     <div class="td-detail-modal-body" id="tdDetailModalBody"></div>
   </div>
 
-  <!-- 定期タスク通知設定モーダル（表示日数） -->
+  <!-- 通知・表示設定モーダル（期日が近いと判定するしきい値） -->
   <div class="td-modal-overlay td-modal-overlay-over-panel" id="tdRecurringNotifyOverlay" style="display:none;"></div>
   <div class="td-modal td-modal-over-panel" id="tdRecurringNotifyModal" style="display:none;">
     <div class="td-modal-header">
-      <span class="td-modal-title"><i class="bi bi-gear"></i> 定期タスクの通知設定</span>
+      <span class="td-modal-title"><i class="bi bi-gear"></i> 通知・表示設定</span>
       <button class="td-panel-close" id="tdRecurringNotifyClose"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="td-modal-body">
       <div class="td-field">
-        <span class="td-label">期日の何日前から表示するか（周期種別ごと）</span>
+        <span class="td-label">通常タスク：期日が近いと判定する営業日数</span>
+        <input type="number" class="td-input td-input-sm" id="tdRNotifyTodo" min="0" max="366">
+      </div>
+      <div class="td-field">
+        <span class="td-label">定期タスク：期日の何日前から表示するか（周期種別ごと・暦日）</span>
       </div>
       <div class="td-field">
         <label class="td-label">週ごとのタスク</label>

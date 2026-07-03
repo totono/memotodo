@@ -17,6 +17,7 @@ func defaultSettings() Settings {
 			"monthly": 7,
 			"yearly":  14,
 		},
+		TodoNearDeadlineDays: DefaultNearDeadlineWorkdays,
 	}
 }
 
@@ -36,6 +37,7 @@ func (s *Store) LoadSettings() (Settings, error) {
 		NotifyTimes          []string       `json:"notify_times"`
 		DetailPattern        string         `json:"detail_pattern"`
 		RecurringDisplayDays map[string]int `json:"recurring_display_days"`
+		TodoNearDeadlineDays int            `json:"todo_near_deadline_days"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return def, nil
@@ -51,6 +53,9 @@ func (s *Store) LoadSettings() (Settings, error) {
 	for k, v := range raw.RecurringDisplayDays {
 		merged.RecurringDisplayDays[k] = v
 	}
+	if raw.TodoNearDeadlineDays > 0 {
+		merged.TodoNearDeadlineDays = raw.TodoNearDeadlineDays
+	}
 	return merged, nil
 }
 
@@ -59,6 +64,7 @@ type SettingsUpdate struct {
 	NotifyTimes          []string
 	DetailPattern        *string
 	RecurringDisplayDays map[string]int
+	TodoNearDeadlineDays *int
 }
 
 // SaveSettings は設定を保存する（既存設定にマージ）。
@@ -75,6 +81,9 @@ func (s *Store) SaveSettings(u SettingsUpdate) (Settings, error) {
 	}
 	for k, v := range u.RecurringDisplayDays {
 		current.RecurringDisplayDays[k] = v
+	}
+	if u.TodoNearDeadlineDays != nil {
+		current.TodoNearDeadlineDays = *u.TodoNearDeadlineDays
 	}
 
 	data, err := json.MarshalIndent(current, "", "  ")

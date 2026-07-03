@@ -111,10 +111,10 @@ async function loadList() {
   const loading = document.getElementById("tdLoading");
   const empty   = document.getElementById("tdEmpty");
   const card    = document.getElementById("tdCard");
+  const noDateCard = document.getElementById("tdNoDateCard");
+  const datedCard  = document.getElementById("tdDatedCard");
   const listNoDate = document.getElementById("tdListNoDate");
   const listDated  = document.getElementById("tdListDated");
-  const noDateLabel = document.getElementById("tdNoDateLabel");
-  const separator   = document.getElementById("tdSeparator");
 
   loading.style.display = "flex";
   empty.style.display   = "none";
@@ -136,7 +136,7 @@ async function loadList() {
       empty.style.display = "block";
       return;
     }
-    card.style.display = "block";
+    card.style.display = "flex";
 
     let noDate = todos.filter(t => !t.deadline);
     let dated  = todos.filter(t => t.deadline);
@@ -147,8 +147,11 @@ async function loadList() {
       dated = [];
     }
 
-    noDateLabel.style.display = (_tab === "pending" && noDate.length && dated.length) ? "block" : "none";
-    separator.style.display   = (_tab === "pending" && dated.length) ? "flex" : "none";
+    // 期日なし／期日ありは見やすさのため別カードに分ける。中身が無いカードは表示しない。
+    noDateCard.style.display = noDate.length ? "block" : "none";
+    datedCard.style.display  = dated.length ? "block" : "none";
+    // 完了済みタブは完了日時順のフラットな一覧のため、「期日なし」の見出しは意味を持たない
+    document.getElementById("tdNoDateLabel").style.display = _tab === "pending" ? "" : "none";
 
     noDate.forEach(todo => listNoDate.appendChild(_buildRow(todo, { draggable: _tab === "pending" })));
     dated.forEach(todo  => listDated.appendChild(_buildRow(todo, { draggable: false })));
@@ -287,6 +290,22 @@ function _wireRowEvents(row, wrap, todo, opts) {
       loadList();
     });
   }
+}
+// #endregion
+
+// #region タブ切り替え
+// タブクリックと通知トーストからの遷移の両方で共有する。loadList() は非同期のため、
+// 呼び出し元がそれぞれ独立に loadList() を呼ぶと2回分の描画が競合してレイアウトが
+// 二重に追加されてしまう（例: 通知の「詳細を見る」からタブ切替＋詳細展開を続けて行う場合）。
+// 必ずここを経由して1回のロードに揃える。
+async function switchTab(tabName) {
+  document.querySelectorAll(".td-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+  _tab = tabName;
+  _openId = null;
+  closeDetailModal();
+  document.getElementById("tdBulkDeleteBar").style.display = tabName === "done" ? "flex" : "none";
+  document.getElementById("tdQuickInputWrap").style.display = tabName === "pending" ? "block" : "none";
+  await loadList();
 }
 // #endregion
 
@@ -714,11 +733,16 @@ function _buildRecurringRow(task, variant) {
   const row = document.createElement("div");
   if (variant === "all") {
     row.className = `td-recurring-all-row ${task.is_active ? "" : "is-paused"}`;
+    const isDone = task.status === "done";
     row.innerHTML = `
       <div class="td-recurring-all-info">
         <div class="td-recurring-all-title">${_escape(task.title)}</div>
-        <div class="td-recurring-all-meta">${_escape(_recurringMetaLabel(task))}</div>
+        <div class="td-recurring-all-meta">
+          ${_escape(_recurringMetaLabel(task))}
+          ${task.current_deadline ? `・次回 ${_fmtDeadline(task.current_deadline)}` : ""}
+        </div>
       </div>
+      <span class="td-recurring-status-chip ${isDone ? "is-done" : "is-pending"}">${isDone ? "今期完了" : "未完了"}</span>
       <div class="td-recurring-all-actions">
         <button class="td-icon-btn" data-action="delete-recurring" title="削除"><i class="bi bi-trash3"></i></button>
       </div>`;
@@ -783,29 +807,31 @@ function _buildRecurringRow(task, variant) {
   return wrap;
 }
 
+// 定期タスクパネルを開く。トレイの縦タブクリックのほか、通知トーストの
+// 定期タスク項目クリックからも共通で呼び出す。
+function openRecurringPanel() {
+  document.getElementById("tdRecurringOverlay").style.display = "block";
+  document.getElementById("tdRecurringPanel").classList.add("is-open");
+  renderRecurringPanel();
+}
+
+function closeRecurringPanel() {
+  document.getElementById("tdRecurringOverlay").style.display = "none";
+  document.getElementById("tdRecurringPanel").classList.remove("is-open");
+  _recurringOpenId = null;
+  _activeModalKind = null;
+  document.getElementById("tdDetailOverlay").style.display = "none";
+  document.getElementById("tdDetailModal").style.display   = "none";
+}
+
 function _initRecurringPanel() {
   const tab      = document.getElementById("tdRecurringTab");
   const overlay  = document.getElementById("tdRecurringOverlay");
-  const panel    = document.getElementById("tdRecurringPanel");
   const btnClose = document.getElementById("tdBtnRecurringClose");
 
-  function open() {
-    overlay.style.display = "block";
-    panel.classList.add("is-open");
-    renderRecurringPanel();
-  }
-  function close() {
-    overlay.style.display = "none";
-    panel.classList.remove("is-open");
-    _recurringOpenId = null;
-    _activeModalKind = null;
-    document.getElementById("tdDetailOverlay").style.display = "none";
-    document.getElementById("tdDetailModal").style.display   = "none";
-  }
-
-  tab.addEventListener("click", open);
-  btnClose.addEventListener("click", close);
-  _bindOutsideDismiss(overlay, close);
+  tab.addEventListener("click", openRecurringPanel);
+  btnClose.addEventListener("click", closeRecurringPanel);
+  _bindOutsideDismiss(overlay, closeRecurringPanel);
 
   document.getElementById("tdBtnRecurringAdd").addEventListener("click", () => openRecurringDetail(null));
 }
@@ -992,6 +1018,7 @@ function _initRecurringNotifyModal() {
   const fWeekly  = document.getElementById("tdRNotifyWeekly");
   const fMonthly = document.getElementById("tdRNotifyMonthly");
   const fYearly  = document.getElementById("tdRNotifyYearly");
+  const fTodo    = document.getElementById("tdRNotifyTodo");
 
   async function open() {
     try {
@@ -1000,8 +1027,9 @@ function _initRecurringNotifyModal() {
       fWeekly.value  = days.weekly ?? 3;
       fMonthly.value = days.monthly ?? 7;
       fYearly.value  = days.yearly ?? 14;
+      fTodo.value    = settings.todo_near_deadline_days ?? 3;
     } catch (e) {
-      fWeekly.value = 3; fMonthly.value = 7; fYearly.value = 14;
+      fWeekly.value = 3; fMonthly.value = 7; fYearly.value = 14; fTodo.value = 3;
     }
     overlay.style.display = "block";
     modal.style.display   = "flex";
@@ -1025,9 +1053,11 @@ function _initRecurringNotifyModal() {
           monthly: parseInt(fMonthly.value, 10) || 0,
           yearly: parseInt(fYearly.value, 10) || 0,
         },
+        todo_near_deadline_days: parseInt(fTodo.value, 10) || 0,
       });
       close();
       renderRecurringPanel();
+      if (_tab) loadList();
     } catch (e) {
       alert(_errMsg(e) || "保存に失敗しました");
     }
@@ -1121,7 +1151,7 @@ function _initSettingsModal() {
 // #region 通知トースト（リマインダー・定期通知）
 // 旧実装の別プロセス・別ウィンドウのポップアップ（popup_server.py）を、
 // 単一ウィンドウ内のオーバーレイに置き換えたもの。ユーザーが手動で閉じるまで
-// （定期通知は10秒のタイムアウトで）残る、という挙動自体は再現する。
+// （定期通知は30秒のタイムアウトで）残る、という挙動自体は再現する。
 let _toastTimer = null;
 
 function _closeToast() {
@@ -1183,56 +1213,140 @@ function _renderReminderToast(todo) {
       _closeToast();
     });
   });
-  toast.querySelector('[data-toast-action="detail"]').addEventListener("click", () => {
+  toast.querySelector('[data-toast-action="detail"]').addEventListener("click", async () => {
     _closeToast();
-    document.querySelector('.td-tab[data-tab="pending"]')?.click();
-    toggleDetail(todo.id);
+    if (_tab !== "pending") await switchTab("pending");
+    // 通知経由の場合は、インライン設定でも一覧内スクロールを要求せず
+    // 常にモーダルで詳細を開く（該当メモへすぐアクセスできるようにするため）。
+    _openId = todo.id;
+    openDetailModal(todo.id);
   });
 }
 
-function _renderPeriodicToast(payload) {
-  const { count, recurring_overdue: recurringOverdue, near_deadline_days: nearDeadlineDays } = payload;
+// 定期通知トーストで1件分の項目行を作る（クリックで該当タスクへジャンプ）。
+function _toastItemRow(title, metaText, onClick) {
+  const row = document.createElement("div");
+  row.className = "td-toast-item";
+  row.innerHTML = `
+    <span class="td-toast-item-title">${_escape(title)}</span>
+    ${metaText ? `<span class="td-toast-item-meta">${_escape(metaText)}</span>` : ""}
+  `;
+  row.addEventListener("click", onClick);
+  return row;
+}
 
-  const html = `
+function _toastGroupBlock(labelHtml, variant, items) {
+  if (!items.length) return null;
+  const block = document.createElement("div");
+  block.className = `td-toast-group ${variant === "overdue" ? "is-overdue" : ""}`;
+  block.innerHTML = `<div class="td-toast-group-label">${labelHtml}（${items.length}件）</div>`;
+  const list = document.createElement("div");
+  list.className = "td-toast-group-list";
+  items.forEach(item => list.appendChild(item));
+  block.appendChild(list);
+  return block;
+}
+
+// 定期通知：残タスク（定期タスク期限切れ）／定期タスクの期日が近い／
+// 通常タスクの期限切れ／通常タスクの期日が近い、の4区分を都度取得して一覧表示する。
+// 旧実装は件数のみの通知で「一覧を開く」ボタンが実質何も開かなかったため、
+// 各項目をクリックで直接該当タスクへ遷移できるようにしている。
+async function _renderPeriodicToast() {
+  let memos = [];
+  let recurringPanel = { overdue: [], current: [] };
+  try {
+    [memos, recurringPanel] = await Promise.all([
+      App.GetNearOrOverdueMemos(),
+      App.GetRecurringPanel(),
+    ]);
+  } catch (e) {
+    return;
+  }
+  memos = memos || [];
+  const recurringOverdue = recurringPanel.overdue || [];
+  const recurringNear = (recurringPanel.current || []).filter(t => t.status === "pending");
+  const todoOverdue = memos.filter(t => t.is_overdue);
+  const todoNear = memos.filter(t => !t.is_overdue && t.is_near);
+
+  if (!recurringOverdue.length && !recurringNear.length && !todoOverdue.length && !todoNear.length) {
+    return;
+  }
+
+  const body = document.createElement("div");
+  body.className = "td-toast-body";
+
+  const recurringItems = [
+    _toastGroupBlock('<i class="bi bi-exclamation-triangle-fill"></i> 定期タスク：残タスク（期限切れ）', "overdue",
+      recurringOverdue.map(t => _toastItemRow(t.title, _fmtDeadline(t.current_deadline), () => {
+        _closeToast();
+        openRecurringPanel();
+      }))),
+    _toastGroupBlock('<i class="bi bi-arrow-repeat"></i> 定期タスク：期日が近い', "near",
+      recurringNear.map(t => _toastItemRow(t.title, _fmtDeadline(t.current_deadline), () => {
+        _closeToast();
+        openRecurringPanel();
+      }))),
+  ].filter(Boolean);
+
+  const todoItems = [
+    _toastGroupBlock('<i class="bi bi-exclamation-triangle-fill"></i> 通常タスク：期限切れ', "overdue",
+      todoOverdue.map(t => _toastItemRow(t.title, _fmtDeadline(t.deadline), async () => {
+        _closeToast();
+        if (_tab !== "pending") await switchTab("pending");
+        _openId = t.id;
+        openDetailModal(t.id);
+      }))),
+    _toastGroupBlock('<i class="bi bi-calendar-check"></i> 通常タスク：期日が近い', "near",
+      todoNear.map(t => _toastItemRow(t.title, _fmtDeadline(t.deadline), async () => {
+        _closeToast();
+        if (_tab !== "pending") await switchTab("pending");
+        _openId = t.id;
+        openDetailModal(t.id);
+      }))),
+  ].filter(Boolean);
+
+  if (recurringItems.length) {
+    const group = document.createElement("div");
+    group.className = "td-toast-supergroup";
+    group.innerHTML = `<div class="td-toast-supergroup-label">定期タスク</div>`;
+    recurringItems.forEach(b => group.appendChild(b));
+    body.appendChild(group);
+  }
+  if (todoItems.length) {
+    const group = document.createElement("div");
+    group.className = "td-toast-supergroup";
+    group.innerHTML = `<div class="td-toast-supergroup-label">通常タスク</div>`;
+    todoItems.forEach(b => group.appendChild(b));
+    body.appendChild(group);
+  }
+
+  const toast = document.getElementById("tdToast");
+  toast.innerHTML = `
     <div class="td-toast-header">
       <span class="td-toast-label">MemoTodo リマインド</span>
       <button class="td-toast-close" data-toast-action="close"><i class="bi bi-x-lg"></i></button>
     </div>
-    <div class="td-toast-body">
-      ${recurringOverdue > 0 ? `
-        <div class="td-toast-overdue-block">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          <span>期限が切れた定期タスクが ${recurringOverdue} 件あります</span>
-        </div>` : ""}
-      ${count > 0 ? `
-        <div class="td-toast-near-block">
-          <i class="bi bi-calendar-check"></i>
-          <div>
-            <div class="td-toast-near-main">期日が近いものが ${count} 件あります</div>
-            <div class="td-toast-near-meta">営業日 ${nearDeadlineDays} 日以内（超過分を含む）</div>
-          </div>
-        </div>` : ""}
-    </div>
-    <div class="td-toast-actions">
-      <button class="td-btn td-btn-primary" data-toast-action="list">一覧を開く</button>
-      <button class="td-btn td-btn-secondary" data-toast-action="close">閉じる</button>
-    </div>
   `;
-  _showToast(html, 10);
+  toast.appendChild(body);
+  const actions = document.createElement("div");
+  actions.className = "td-toast-actions";
+  actions.innerHTML = `<button class="td-btn td-btn-secondary" data-toast-action="close">閉じる</button>`;
+  toast.appendChild(actions);
 
-  const toast = document.getElementById("tdToast");
-  toast.querySelector('[data-toast-action="list"]').addEventListener("click", () => {
-    _closeToast();
-    document.querySelector('.td-tab[data-tab="pending"]')?.click();
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+  toast.style.display = "block";
+  toast.querySelectorAll('[data-toast-action="close"]').forEach(el => {
+    el.addEventListener("click", _closeToast);
   });
+  _toastTimer = setTimeout(_closeToast, 30000);
 }
 
 function _initNotifications() {
   EventsOn("todo:reminder", (payload) => {
     if (payload && payload.todo) _renderReminderToast(payload.todo);
   });
-  EventsOn("todo:periodic", (payload) => {
-    if (payload) _renderPeriodicToast(payload);
+  EventsOn("todo:periodic", () => {
+    _renderPeriodicToast();
   });
   EventsOn("todo:focus-quick-input", () => {
     focusQuickInput();
@@ -1290,16 +1404,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.querySelectorAll(".td-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".td-tab").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-      _tab = tab.dataset.tab;
-      _openId = null;
-      closeDetailModal();
-      document.getElementById("tdBulkDeleteBar").style.display = _tab === "done" ? "flex" : "none";
-      document.getElementById("tdQuickInputWrap").style.display = _tab === "pending" ? "block" : "none";
-      loadList();
-    });
+    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   });
 
   document.getElementById("tdBtnBulkDeleteAll").addEventListener("click", async () => {

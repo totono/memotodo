@@ -48,13 +48,15 @@ func (s *Store) GetTodos(status string) ([]Todo, error) {
 	}
 	defer rows.Close()
 
+	nearDays := s.nearDeadlineWorkdays()
+
 	var result []Todo
 	for rows.Next() {
 		t, err := scanTodo(rows)
 		if err != nil {
 			return nil, err
 		}
-		attachFlags(&t)
+		attachFlags(&t, nearDays)
 		result = append(result, t)
 	}
 	return result, rows.Err()
@@ -70,8 +72,18 @@ func (s *Store) GetTodo(id int64) (Todo, bool, error) {
 	if err != nil {
 		return Todo{}, false, err
 	}
-	attachFlags(&t)
+	attachFlags(&t, s.nearDeadlineWorkdays())
 	return t, true, nil
+}
+
+// nearDeadlineWorkdays はユーザー設定の「期日が近い」しきい値（営業日数）を返す。
+// 設定が読めない場合はデフォルト値にフォールバックする。
+func (s *Store) nearDeadlineWorkdays() int {
+	settings, err := s.LoadSettings()
+	if err != nil || settings.TodoNearDeadlineDays <= 0 {
+		return DefaultNearDeadlineWorkdays
+	}
+	return settings.TodoNearDeadlineDays
 }
 
 // CreateTodoInput は新規メモ登録の入力値。

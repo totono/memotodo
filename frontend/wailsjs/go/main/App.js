@@ -26,6 +26,10 @@ export function DeleteTodo(arg1) {
   return window['go']['main']['App']['DeleteTodo'](arg1);
 }
 
+export function GetNearOrOverdueMemos() {
+  return window['go']['main']['App']['GetNearOrOverdueMemos']();
+}
+
 export function GetRecurringPanel() {
   return window['go']['main']['App']['GetRecurringPanel']();
 }

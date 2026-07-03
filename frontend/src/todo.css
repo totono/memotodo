@@ -243,6 +243,13 @@ html, body {
   font-size: 13px;
 }
 
+/* 期日なし／期日ありを別カードに分けて表示するためのラッパー */
+.td-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .td-card {
   background: var(--bg-panel);
   border-radius: 16px;
@@ -255,10 +262,14 @@ html, body {
   font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .td-list { display: flex; flex-direction: column; }
 
+/* 定期タスクパネルの「すべての定期タスク」見出し等で使う区切り線 */
 .td-separator {
   display: flex;
   align-items: center;
@@ -289,8 +300,10 @@ html, body {
 }
 .td-row:hover { background: #FBFAF7; }
 
-.td-row.is-overdue { background: #FDF8F6; }
+.td-row.is-overdue { background: #FDF8F6; box-shadow: inset 3px 0 0 var(--danger); }
 .td-row.is-important { box-shadow: inset 3px 0 0 var(--warn); }
+/* 期日超過は重要フラグより優先して赤で強調する（両方立っている場合は超過を優先） */
+.td-row.is-important.is-overdue { box-shadow: inset 3px 0 0 var(--danger); }
 .td-row.is-done { background: var(--bg-row-done); }
 .td-row.is-done .td-row-title { color: var(--text-done); text-decoration: line-through; }
 
@@ -653,6 +666,13 @@ html, body {
 .td-recurring-all-meta { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
 .td-recurring-all-actions { display: flex; gap: 2px; flex-shrink: 0; }
 
+.td-recurring-status-chip {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.td-recurring-status-chip.is-pending { background: var(--bg); color: var(--text-secondary); }
+.td-recurring-status-chip.is-done { background: var(--success-bg); color: var(--success); }
+
 /* 定期タスクの追加・編集フォーム（パネル内インライン展開） */
 .td-recurring-detail-inline {
   background: #FBFAF7;
@@ -872,12 +892,15 @@ html, body {
   position: fixed;
   right: 20px;
   bottom: 20px;
-  width: 340px;
+  width: 380px;
   max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
   background: var(--bg-panel);
   border-radius: 14px;
   box-shadow: 0 12px 36px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
   z-index: 500;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   animation: td-toast-in .18s ease-out;
 }
@@ -892,6 +915,7 @@ html, body {
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .td-toast-label {
   font-size: 11px;
@@ -912,7 +936,10 @@ html, body {
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .td-toast-title { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: pre-wrap; }
 .td-toast-meta { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
@@ -948,15 +975,43 @@ html, body {
 }
 .td-btn-snooze:hover { background: var(--bg); border-color: #CCC9C0; color: var(--text-primary); }
 
-.td-toast-actions { display: flex; gap: 8px; padding: 8px 16px 14px; }
+.td-toast-actions { display: flex; gap: 8px; padding: 8px 16px 14px; flex-shrink: 0; }
 .td-toast-actions .td-btn { flex: 1; padding: 7px 0; font-size: 12px; }
+
+/* 定期通知：定期／通常タスクのグループ表示 */
+.td-toast-supergroup + .td-toast-supergroup { margin-top: 4px; }
+.td-toast-supergroup-label {
+  font-size: 11px; font-weight: 700; color: var(--text-secondary);
+  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+}
+.td-toast-group + .td-toast-group { margin-top: 10px; }
+.td-toast-group-label {
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+  display: flex; align-items: center; gap: 5px; margin-bottom: 4px;
+}
+.td-toast-group.is-overdue .td-toast-group-label { color: var(--danger); }
+.td-toast-group-list { display: flex; flex-direction: column; }
+.td-toast-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 12.5px; transition: background .12s;
+}
+.td-toast-item:hover { background: var(--bg); }
+.td-toast-group.is-overdue .td-toast-item:hover { background: var(--danger-bg); }
+.td-toast-item-title {
+  color: var(--text-primary); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; flex: 1; min-width: 0;
+}
+.td-toast-item-meta { color: var(--text-secondary); font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+.td-toast-group.is-overdue .td-toast-item-meta { color: var(--danger); font-weight: 700; }
 
 /* ========================================
    レスポンシブ
    ======================================== */
 @media (max-width: 900px) {
   .td-content { margin-left: 0; }
-  .td-recurring-tab { display: none; }
+  /* 定期タスクタブは position:absolute でコンテンツと独立しているため、
+     幅が狭くなっても隠さずそのまま表示する（隠すとアクセス手段が無くなるため） */
 }
 
 @media (max-width: 600px) {

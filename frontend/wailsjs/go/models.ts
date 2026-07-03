@@ -44,6 +44,7 @@ export namespace main {
 	    notify_times: string[];
 	    detail_pattern?: string;
 	    recurring_display_days: Record<string, number>;
+	    todo_near_deadline_days?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveSettingsRequest(source);
@@ -54,6 +55,7 @@ export namespace main {
 	        this.notify_times = source["notify_times"];
 	        this.detail_pattern = source["detail_pattern"];
 	        this.recurring_display_days = source["recurring_display_days"];
+	        this.todo_near_deadline_days = source["todo_near_deadline_days"];
 	    }
 	}
 	export class UpdateRecurringTaskRequest {
@@ -208,6 +210,7 @@ export namespace todo {
 	    notify_times: string[];
 	    detail_pattern: string;
 	    recurring_display_days: Record<string, number>;
+	    todo_near_deadline_days: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -218,6 +221,7 @@ export namespace todo {
 	        this.notify_times = source["notify_times"];
 	        this.detail_pattern = source["detail_pattern"];
 	        this.recurring_display_days = source["recurring_display_days"];
+	        this.todo_near_deadline_days = source["todo_near_deadline_days"];
 	    }
 	}
 	export class Todo {

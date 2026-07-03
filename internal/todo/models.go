@@ -47,6 +47,8 @@ type Settings struct {
 	NotifyTimes          []string       `json:"notify_times"`
 	DetailPattern        string         `json:"detail_pattern"` // "inline" | "modal"
 	RecurringDisplayDays map[string]int `json:"recurring_display_days"`
+	// TodoNearDeadlineDays は通常メモの「期日が近い」判定に使う営業日数のしきい値。
+	TodoNearDeadlineDays int `json:"todo_near_deadline_days"`
 }
 
 // RecurringPanelData は定期タスクパネル表示用のデータ。
