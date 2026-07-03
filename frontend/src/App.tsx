@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettings } from './hooks/useSettings'
 import { useTodos } from './hooks/useTodos'
 import { useUiStore } from './state/uiStore'
@@ -6,6 +6,7 @@ import Tabs from './components/Tabs'
 import TodoList from './components/TodoList'
 import QuickInput from './components/QuickInput'
 import DetailModal from './components/DetailModal'
+import SettingsModal from './components/SettingsModal'
 
 export default function App() {
   const { data: settings } = useSettings()
@@ -15,6 +16,7 @@ export default function App() {
   const detailPattern = useUiStore((s) => s.detailPattern)
   const { data: todos } = useTodos()
   const openTodo = openId != null ? todos?.find((t) => t.id === openId) : undefined
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     if (settings?.detail_pattern === 'inline' || settings?.detail_pattern === 'modal') {
@@ -31,7 +33,7 @@ export default function App() {
             <span className="td-header-title">MemoTodo</span>
           </div>
           <div className="td-header-actions">
-            <button className="td-icon-btn td-btn-settings" title="設定">
+            <button className="td-icon-btn td-btn-settings" title="設定" onClick={() => setSettingsOpen(true)}>
               <i className="bi bi-gear" />
             </button>
           </div>
@@ -45,6 +47,7 @@ export default function App() {
         </div>
       </main>
       {detailPattern === 'modal' && openTodo && <DetailModal todo={openTodo} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )
 }
