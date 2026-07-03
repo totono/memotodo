@@ -1,10 +1,33 @@
+import type { CSSProperties } from 'react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Todo } from '../api/client'
 import { useUiStore } from '../state/uiStore'
 import { useTodoMutations } from '../hooks/useTodoMutations'
 import { fmtDeadline, previewText } from '../lib/format'
 import TodoDetail from './TodoDetail'
 
-export default function TodoRow({ todo }: { todo: Todo }) {
+interface Sortable {
+  attributes: ReturnType<typeof useSortable>['attributes']
+  listeners: ReturnType<typeof useSortable>['listeners']
+  setNodeRef: ReturnType<typeof useSortable>['setNodeRef']
+  dndStyle: CSSProperties
+}
+
+export default function TodoRow({ todo, draggable = false }: { todo: Todo; draggable?: boolean }) {
+  if (draggable) {
+    return <SortableTodoRow todo={todo} />
+  }
+  return <TodoRowContent todo={todo} />
+}
+
+function SortableTodoRow({ todo }: { todo: Todo }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: todo.id })
+  const dndStyle = { transform: CSS.Transform.toString(transform), transition }
+  return <TodoRowContent todo={todo} sortable={{ attributes, listeners, setNodeRef, dndStyle }} />
+}
+
+function TodoRowContent({ todo, sortable }: { todo: Todo; sortable?: Sortable }) {
   const activeTab = useUiStore((s) => s.activeTab)
   const openId = useUiStore((s) => s.openId)
   const detailPattern = useUiStore((s) => s.detailPattern)
@@ -24,8 +47,13 @@ export default function TodoRow({ todo }: { todo: Todo }) {
   const chipClass = todo.is_overdue && !isDone ? 'is-overdue' : todo.is_near && !isDone ? 'is-near' : ''
 
   return (
-    <div className="td-row-wrap" data-id={todo.id}>
+    <div className="td-row-wrap" data-id={todo.id} ref={sortable?.setNodeRef} style={sortable?.dndStyle}>
       <div className={rowClass}>
+        {sortable ? (
+          <div className="td-drag-handle" title="ドラッグして並び替え" {...sortable.attributes} {...sortable.listeners}>
+            <i className="bi bi-grip-vertical" />
+          </div>
+        ) : null}
         <div className={`td-checkbox ${isDone ? 'is-checked' : ''}`} title={isDone ? '未完了に戻す' : '完了にする'} onClick={() => (isDone ? restore.mutate(todo.id) : complete.mutate(todo.id))}>
           {isDone ? <i className="bi bi-check-lg" /> : null}
         </div>

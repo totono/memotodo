@@ -23,5 +23,10 @@ export function useTodoMutations() {
     onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: ['todo', id] }) },
   })
 
-  return { create, complete, restore, remove, toggleImportant, update, invalidateLists }
+  const reorder = useMutation({
+    mutationFn: (ids: number[]) => App.ReorderTodos(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['todos', 'pending'] }),
+  })
+
+  return { create, complete, restore, remove, toggleImportant, update, invalidateLists, reorder }
 }
