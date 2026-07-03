@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useSettings } from './hooks/useSettings'
 import { useUiStore } from './state/uiStore'
+import Tabs from './components/Tabs'
+import TodoList from './components/TodoList'
 
 export default function App() {
   const { data: settings } = useSettings()
@@ -29,7 +31,8 @@ export default function App() {
       </header>
       <main className="td-main">
         <div className="td-content">
-          {/* Tabs / QuickInput / TodoList はこの後のタスクで差し込む */}
+          <Tabs />
+          <div className="td-list-wrap"><TodoList /></div>
         </div>
       </main>
     </div>
