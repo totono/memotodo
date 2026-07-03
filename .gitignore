@@ -1,5 +1,2 @@
 /build/bin/
-/frontend/dist/
-/frontend/node_modules/
 *.log
-/frontend/package.json.md5

@@ -26,7 +26,12 @@ Windows での常駐利用を想定して作られています。Wails のクロ
 
 ## 開発・ビルド
 
+フロントエンドはバンドラーを使わないプレーンな HTML/CSS/JS（ES Modules）構成のため、**Node.js / npm は不要**です。[Go](https://go.dev/) と [Wails CLI](https://wails.io/docs/gettingstarted/installation) さえあればビルドできます。
+
 ```sh
+# Wails CLI（初回のみ）
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
 # 開発サーバー
 wails dev
 
@@ -45,6 +50,14 @@ wails build -platform windows/amd64 -nsis
 
 生成物は `build/bin/` 配下に出力されます。
 
+### GitHub Releases への自動公開
+
+`v1.0.0` のような `v` から始まるタグを push すると、`.github/workflows/release.yml` が Windows 向けビルド（ポータブル zip ＋ NSIS インストーラー）を作成し、GitHub Release に自動で添付します（`workflow_dispatch` から手動実行も可能）。
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## ライセンス
 

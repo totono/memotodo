@@ -1,8 +1,8 @@
 // MemoTodo - メイン画面ロジック
 // 旧 Flask REST API (fetch) 呼び出しを Wails の Go バインディングに置き換えたもの。
 
-import * as App from '../wailsjs/go/main/App';
-import { EventsOn } from '../wailsjs/runtime/runtime';
+import * as App from '../wailsjs/go/main/App.js';
+import { EventsOn } from '../wailsjs/runtime/runtime.js';
 
 // #region 定数・状態
 let _tab             = "pending"; // "pending" | "done"

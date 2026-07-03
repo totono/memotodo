@@ -18,7 +18,11 @@ import (
 	"memotodo/internal/tray"
 )
 
-//go:embed all:frontend/dist
+// フロントエンドはバンドラーを使わないプレーンな ES Modules 構成のため、
+// npm/Node.js を必要とせず frontend/ の中身をそのまま埋め込む
+// （wails.json の frontend:install / frontend:build は空にしてある）。
+//
+//go:embed all:frontend
 var assets embed.FS
 
 // singleInstancePort は多重起動防止用のロック代わりに使うポート。
@@ -39,7 +43,7 @@ func main() {
 	app := NewApp()
 
 	// /todo-images/ 配下は SaveImage で保存した画像ファイルをディスクから配信する。
-	// それ以外は埋め込みフロントエンド資産（frontend/dist）を配信する。
+	// それ以外は埋め込みフロントエンド資産（frontend/）を配信する。
 	imagesMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/todo-images/") {
@@ -59,7 +63,7 @@ func main() {
 		})
 	}
 
-	distFS, err := fs.Sub(assets, "frontend/dist")
+	frontendFS, err := fs.Sub(assets, "frontend")
 	if err != nil {
 		fmt.Println("フロントエンド資産の読み込みに失敗しました:", err)
 		os.Exit(1)
@@ -72,7 +76,7 @@ func main() {
 		Width:  1180,
 		Height: 800,
 		AssetServer: &assetserver.Options{
-			Assets:     distFS,
+			Assets:     frontendFS,
 			Middleware: imagesMiddleware,
 		},
 		BackgroundColour: &options.RGBA{R: 247, G: 246, B: 243, A: 1},
