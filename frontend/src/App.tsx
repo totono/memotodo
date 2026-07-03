@@ -1,4 +1,17 @@
+import { useEffect } from 'react'
+import { useSettings } from './hooks/useSettings'
+import { useUiStore } from './state/uiStore'
+
 export default function App() {
+  const { data: settings } = useSettings()
+  const setDetailPattern = useUiStore((s) => s.setDetailPattern)
+
+  useEffect(() => {
+    if (settings?.detail_pattern === 'inline' || settings?.detail_pattern === 'modal') {
+      setDetailPattern(settings.detail_pattern)
+    }
+  }, [settings?.detail_pattern, setDetailPattern])
+
   return (
     <div className="td-app">
       <header className="td-header">
