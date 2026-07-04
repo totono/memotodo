@@ -142,6 +142,7 @@ func main() {
 			// 定期通知トーストはメインウィンドウが隠れたら消しておく
 			// （再度開いたときに古い通知が残っているのを防ぐため）。
 			wailsruntime.EventsEmit(ctx, "todo:window-hidden")
+			app.windowVisible.Store(false)
 			wailsruntime.WindowHide(ctx)
 			return true
 		},
