@@ -41,7 +41,7 @@ export default function PeriodicToast() {
   )
   const group = (label: string, overdue: boolean, rows: ReactNode[]) =>
     rows.length === 0 ? null : (
-      <div className={`td-dtoast-group${overdue ? ' is-overdue' : ''}`}>
+      <div key={label} className={`td-dtoast-group${overdue ? ' is-overdue' : ''}`}>
         <div className="td-dtoast-group-label">{label}（{rows.length}件）</div>
         <div className="td-dtoast-group-list">{rows}</div>
       </div>
