@@ -6,5 +6,9 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
-  "author": { "name": "MemoTodo", "email": "" }
+  "author": { "name": "MemoTodo", "email": "" },
+  "info": {
+    "productName": "MemoTodo",
+    "productVersion": "0.0.0"
+  }
 }
