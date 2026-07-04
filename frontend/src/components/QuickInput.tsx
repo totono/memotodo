@@ -1,11 +1,16 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { main } from '../api/client'
 import { useTodoMutations } from '../hooks/useTodoMutations'
+import { useUiStore } from '../state/uiStore'
 
 export default function QuickInput() {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
   const { create } = useTodoMutations()
+  const focusToken = useUiStore((s) => s.quickInputFocusToken)
+  useEffect(() => {
+    if (focusToken > 0) ref.current?.focus()
+  }, [focusToken])
 
   const submit = () => {
     if (create.isPending) return

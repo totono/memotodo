@@ -3,6 +3,7 @@ import { useSettings } from './hooks/useSettings'
 import { useTodos } from './hooks/useTodos'
 import { useUiStore } from './state/uiStore'
 import { useInlineDetailOutsideClose } from './hooks/useInlineDetailOutsideClose'
+import { useAppEvents } from './hooks/useAppEvents'
 import Tabs from './components/Tabs'
 import TodoList from './components/TodoList'
 import QuickInput from './components/QuickInput'
@@ -10,6 +11,7 @@ import DetailModal from './components/DetailModal'
 import SettingsModal from './components/SettingsModal'
 import RecurringTab from './components/RecurringTab'
 import RecurringPanel from './components/RecurringPanel'
+import ToastHost from './components/ToastHost'
 
 export default function App() {
   const { data: settings } = useSettings()
@@ -19,9 +21,13 @@ export default function App() {
   const detailPattern = useUiStore((s) => s.detailPattern)
   const { data: todos } = useTodos()
   const openTodo = openId != null ? todos?.find((t) => t.id === openId) : undefined
+  const forceDetailModalId = useUiStore((s) => s.forceDetailModalId)
+  const setForceDetailModalId = useUiStore((s) => s.setForceDetailModalId)
+  const forcedTodo = forceDetailModalId != null ? todos?.find((t) => t.id === forceDetailModalId) : undefined
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useInlineDetailOutsideClose()
+  useAppEvents()
 
   useEffect(() => {
     if (settings?.detail_pattern === 'inline' || settings?.detail_pattern === 'modal') {
@@ -54,7 +60,9 @@ export default function App() {
       <RecurringTab />
       <RecurringPanel />
       {detailPattern === 'modal' && openTodo && <DetailModal todo={openTodo} />}
+      {forcedTodo && <DetailModal todo={forcedTodo} onClose={() => setForceDetailModalId(null)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <ToastHost />
     </div>
   )
 }
