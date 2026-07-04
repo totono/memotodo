@@ -854,6 +854,9 @@ html, body {
   background: var(--bg); font-family: inherit; font-size: 14px; color: var(--text-primary);
   line-height: 1.6; word-break: break-word; outline: none;
 }
+/* 実際の編集要素は内側の contenteditable(.ProseMirror)。フォーカス時のブラウザ既定 outline（黒枠）を消す。
+   フォーカスの見た目は .td-editor-wrap:focus-within 側で表現する。min-height で箱いっぱいをクリック可能にする。 */
+.td-editor .ProseMirror { outline: none; min-height: 72px; }
 .td-editor:empty::before { content: attr(placeholder); color: var(--text-muted); pointer-events: none; display: block; }
 .td-editor img { max-width: 100%; max-height: 260px; border-radius: var(--radius-sm); margin: 4px 0; display: block; cursor: default; }
 .td-editor a { color: #3D6BAA; text-decoration: underline; cursor: pointer; }

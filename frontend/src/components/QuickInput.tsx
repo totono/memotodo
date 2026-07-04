@@ -12,6 +12,15 @@ export default function QuickInput() {
     if (focusToken > 0) ref.current?.focus()
   }, [focusToken])
 
+  // 内容に合わせて高さを自動調整する（max-height はCSSで220pxに制限、超過分はスクロール）。
+  // border-box なので下端にスクロールバーが出ないよう枠線分(offsetHeight-clientHeight)を足す。
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+  }, [value])
+
   const submit = () => {
     if (create.isPending) return
     const title = value.trim()
@@ -29,12 +38,25 @@ export default function QuickInput() {
     )
   }
 
+  // カーソル位置に改行を挿入する（textarea 既定では Alt+Enter は改行にならないため自前で挿入）。
+  const insertNewline = () => {
+    const el = ref.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    setValue(value.slice(0, start) + '\n' + value.slice(end))
+    // state 反映後の再描画を待ってキャレットを改行直後へ戻す
+    requestAnimationFrame(() => {
+      el.selectionStart = el.selectionEnd = start + 1
+    })
+  }
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter=登録 / Alt+Enter=改行（現行踏襲）
-    if (e.key === 'Enter' && !e.altKey) {
-      e.preventDefault()
-      submit()
-    }
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    if (e.altKey) insertNewline()
+    else submit()
   }
 
   return (

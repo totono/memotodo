@@ -139,10 +139,12 @@ func main() {
 			if quitting {
 				return false
 			}
+			// 隠れる直前にまずフラグを倒す。この後に発火するリマインダーは
+			// アプリ内トーストが見えないので、ネイティブ通知を出す側へ回す。
+			app.windowVisible.Store(false)
 			// 定期通知トーストはメインウィンドウが隠れたら消しておく
 			// （再度開いたときに古い通知が残っているのを防ぐため）。
 			wailsruntime.EventsEmit(ctx, "todo:window-hidden")
-			app.windowVisible.Store(false)
 			wailsruntime.WindowHide(ctx)
 			return true
 		},

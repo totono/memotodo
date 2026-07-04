@@ -21,6 +21,13 @@ export function useTodoMutations() {
   const remove = useMutation({ mutationFn: (id: number) => App.DeleteTodo(id), onSuccess: invalidateLists, onError })
   const toggleImportant = useMutation({ mutationFn: (id: number) => App.ToggleImportant(id), onSuccess: invalidateLists, onError })
 
+  // スヌーズは reminder_at を書き換えるため、他の更新と同じく invalidate で一覧・詳細を再取得する
+  const snooze = useMutation({
+    mutationFn: ({ id, amount }: { id: number; amount: string }) => App.SnoozeReminder(id, amount),
+    onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: qk.todo(id) }) },
+    onError,
+  })
+
   const update = useMutation({
     mutationFn: ({ id, req }: { id: number; req: main.UpdateTodoRequest }) => App.UpdateTodo(id, req),
     onSuccess: (_d, { id }) => { invalidateLists(); qc.invalidateQueries({ queryKey: qk.todo(id) }) },
@@ -33,5 +40,5 @@ export function useTodoMutations() {
     onError,
   })
 
-  return { create, complete, restore, remove, toggleImportant, update, invalidateLists, reorder }
+  return { create, complete, restore, remove, toggleImportant, snooze, update, invalidateLists, reorder }
 }

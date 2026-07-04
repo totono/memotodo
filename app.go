@@ -40,6 +40,9 @@ func NewApp() *App {
 // startup は Wails 起動時に一度だけ呼ばれる。
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// 起動直後はウィンドウが見えている。スケジューラ開始で即発火するリマインダーが
+	// windowVisible を読む前にフラグを立てておく（false のままだとネイティブ通知が二重に出る）。
+	a.windowVisible.Store(true)
 
 	dataDir, err := appDataDir()
 	if err != nil {
@@ -62,7 +65,6 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	a.initWindowsNotifications(dataDir)
-	a.windowVisible.Store(true)
 }
 
 // shutdown は Wails 終了時に呼ばれる。

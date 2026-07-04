@@ -1,5 +1,6 @@
-import { App, Todo } from '../api/client'
+import { Todo } from '../api/client'
 import { useUiStore } from '../state/uiStore'
+import { useTodoMutations } from '../hooks/useTodoMutations'
 
 // "YYYY-MM-DDTHH:mm:ss" -> "YYYY-MM-DD HH:mm"（元実装 _renderReminderToast 準拠）
 function fmtReminderAt(iso: string): string {
@@ -10,16 +11,15 @@ export default function ReminderToast({ todo }: { todo: Todo }) {
   const dismissToast = useUiStore((s) => s.dismissToast)
   const setTab = useUiStore((s) => s.setTab)
   const setForceDetailModalId = useUiStore((s) => s.setForceDetailModalId)
+  const { snooze: snoozeMutation } = useTodoMutations()
   const id = `reminder:${todo.id}`
-  const today = new Date().toISOString().slice(0, 10)
+  // 「今日」はローカル日付で判定する（toISOString は UTC 日付になり JST 早朝に前日へずれるため使わない。fmtDeadline と同じローカル基準）
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const isOverdue = !!todo.reminder_at && todo.reminder_at.slice(0, 10) < today
 
-  const snooze = async (kind: '30' | '60' | 'tomorrow') => {
-    try {
-      await App.SnoozeReminder(todo.id, kind)
-    } catch {
-      // ベストエフォート（元実装も失敗は握りつぶして閉じる）
-    }
+  const snooze = (kind: '30' | '60' | 'tomorrow') => {
+    snoozeMutation.mutate({ id: todo.id, amount: kind })
     dismissToast(id)
   }
   const openDetail = () => {

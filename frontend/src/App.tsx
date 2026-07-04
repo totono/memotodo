@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSettings } from './hooks/useSettings'
-import { useTodos } from './hooks/useTodos'
+import { useTodos, useTodo } from './hooks/useTodos'
 import { useUiStore } from './state/uiStore'
 import { useInlineDetailOutsideClose } from './hooks/useInlineDetailOutsideClose'
 import { useAppEvents } from './hooks/useAppEvents'
@@ -23,7 +23,7 @@ export default function App() {
   const openTodo = openId != null ? todos?.find((t) => t.id === openId) : undefined
   const forceDetailModalId = useUiStore((s) => s.forceDetailModalId)
   const setForceDetailModalId = useUiStore((s) => s.setForceDetailModalId)
-  const forcedTodo = forceDetailModalId != null ? todos?.find((t) => t.id === forceDetailModalId) : undefined
+  const { data: forcedTodo } = useTodo(forceDetailModalId)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useInlineDetailOutsideClose()
